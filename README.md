@@ -48,30 +48,36 @@ Referral Partner · Teacher · School · College · Coaching Center · Influence
 - **Node.js 18+**
 - No database install required (uses JSON file storage in `backend/data/store.json`)
 
-### 1. Backend Setup
+### Run everything (recommended)
+
+From the project root:
 
 ```bash
-cd backend
-cp .env.example .env
 npm install
 npm run dev
 ```
 
-API runs at **http://localhost:5001**
+- **App:** http://localhost:5174  
+- **API:** http://localhost:5001  
 
 Default admin (auto-created on first run):
 - Email: `admin@dreammantra.in`
 - Password: `Admin@123`
 
-### 2. Frontend Setup
+### Or run backend & frontend separately
 
 ```bash
+# Terminal 1 — backend
+cd backend
+cp .env.example .env   # first time only
+npm install
+npm run dev
+
+# Terminal 2 — frontend
 cd client
 npm install
 npm run dev
 ```
-
-App runs at **http://localhost:5174**
 
 ---
 

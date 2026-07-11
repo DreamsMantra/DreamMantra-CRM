@@ -6,6 +6,7 @@ import {
   Upload, Trophy, MessageCircle, Calendar, Store, MapPin, Target,
 } from 'lucide-react';
 import PublicNavbar from '../components/PublicNavbar';
+import CompanyInfoSection, { CompanyFooter } from '../components/CompanyInfoSection';
 
 const features = [
   { icon: ClipboardList, title: 'Lead Submission', desc: 'Rich student forms with class, interests, budget, contact preferences & duplicate detection.' },
@@ -174,17 +175,15 @@ export default function Home() {
         </div>
       </section>
 
+      <CompanyInfoSection />
+
       <section className="border-t border-stone-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-16 text-center">
         <Star className="mx-auto h-8 w-8 text-gold" />
         <h2 className="mt-4 font-display text-2xl font-bold text-stone-900">Ready to partner with Dream Mantra?</h2>
         <Link to="/signup" className="dm-btn-primary mt-6 inline-flex">Start Registration</Link>
       </section>
 
-      <footer className="border-t border-stone-200 bg-white px-4 py-10 text-center text-sm text-stone-500">
-        <p className="font-semibold text-gold-dark">Dream Mantra</p>
-        <p className="mt-1">Education & Career Counselling · Jaipur & Pan-India</p>
-        <p className="mt-1">info@dreammantra.in · +91 9680102276</p>
-      </footer>
+      <CompanyFooter />
     </div>
   );
 }

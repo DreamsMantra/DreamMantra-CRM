@@ -11,6 +11,7 @@ export default function PublicNavbar() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
         <Logo />
         <nav className="hidden items-center gap-6 md:flex">
+          <a href="#about" className="text-sm font-medium text-stone-600 hover:text-gold-dark">About</a>
           <a href="#features" className="text-sm font-medium text-stone-600 hover:text-gold-dark">Features</a>
           <a href="#partners" className="text-sm font-medium text-stone-600 hover:text-gold-dark">Partner Types</a>
           <a href="#how-it-works" className="text-sm font-medium text-stone-600 hover:text-gold-dark">How It Works</a>

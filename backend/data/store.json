@@ -14,8 +14,8 @@
       "convertedLeads": 0,
       "totalEarnings": 0,
       "createdAt": "2026-07-11T05:07:00.453Z",
-      "updatedAt": "2026-07-11T11:23:45.305Z",
-      "lastLoginAt": "2026-07-11T11:23:45.304Z"
+      "updatedAt": "2026-07-11T11:54:06.372Z",
+      "lastLoginAt": "2026-07-11T11:54:06.372Z"
     },
     {
       "id": "hJoeencXUQP4",
@@ -66,6 +66,8 @@
     "whatsappNumber": "919680102276",
     "welcomeMessage": "Welcome to Dream Mantra Partner Network!",
     "minPayoutAmount": 500,
-    "autoApprovePartners": false
-  }
+    "autoApprovePartners": false,
+    "customForms": []
+  },
+  "messages": []
 }

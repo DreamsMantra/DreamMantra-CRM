@@ -4,6 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { User, Lock, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Logo from '../components/Logo';
+import CompanyInfoSection from '../components/CompanyInfoSection';
+import { COMPANY } from '../utils/companyInfo';
 
 export default function Login() {
   const { login, user, loading: authLoading } = useAuth();
@@ -45,8 +47,13 @@ export default function Login() {
           <p className="mt-4 max-w-md text-lg text-stone-600">
             Track student leads, commissions, and referrals — all in one professional dashboard.
           </p>
+          <div className="mt-6 max-w-md">
+            <CompanyInfoSection compact />
+          </div>
         </motion.div>
-        <p className="text-sm text-stone-400">© Dream Mantra · Education & Career Counselling</p>
+        <p className="text-sm text-stone-400">
+          © {COMPANY.name} · <a href={COMPANY.website} target="_blank" rel="noreferrer" className="hover:text-gold-dark">dreammantra.in</a>
+        </p>
       </div>
 
       <div className="flex flex-1 items-center justify-center p-6">
