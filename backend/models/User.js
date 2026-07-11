@@ -8,6 +8,7 @@ export const PARTNER_TYPES = [
   'coaching_center',
   'influencer',
   'counsellor',
+  'franchise',
 ];
 
 export const USER_ROLES = ['admin', 'partner'];

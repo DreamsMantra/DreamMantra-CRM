@@ -24,6 +24,7 @@ export default function PublicNavbar() {
           ) : (
             <>
               <Link to="/login" className="dm-btn-ghost text-sm">Sign In</Link>
+              <Link to="/signup?type=franchise" className="dm-btn-ghost text-sm hidden sm:inline-flex">Franchise</Link>
               <Link to="/signup" className="dm-btn-primary text-sm">Become a Partner</Link>
             </>
           )}

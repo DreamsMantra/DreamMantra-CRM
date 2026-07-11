@@ -3,13 +3,14 @@ import bcrypt from 'bcryptjs';
 import * as db from '../lib/db.js';
 import { PARTNER_TYPES } from '../lib/db.js';
 import { signToken, authRequired, loadUser } from '../middleware/auth.js';
-import { generateReferralCode, generateLoginId, isValidLoginId, normalizeLoginId } from '../utils/helpers.js';
+import { generateReferralCode, generateLoginId, isValidLoginId, normalizeLoginId, generateFranchiseCode } from '../utils/helpers.js';
 
 const router = Router();
 
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, phone, password, partnerType, organization, city, state, address } = req.body;
+    const { name, email, phone, password, partnerType, organization, city, state, address,
+      franchiseName, territory, outletCount, investmentTier, operatingModel } = req.body;
     if (!name?.trim() || !email?.trim() || !password || !partnerType) {
       return res.status(400).json({ message: 'Name, email, password and partner type are required' });
     }
@@ -49,6 +50,17 @@ router.post('/register', async (req, res) => {
       address: address?.trim() || '',
       referralCode,
       status: 'pending',
+      ...(partnerType === 'franchise' ? {
+        franchiseName: franchiseName?.trim() || organization?.trim() || name.trim(),
+        territory: territory?.trim() || city?.trim() || '',
+        outletCount: Number(outletCount) || 1,
+        investmentTier: investmentTier || 'starter',
+        operatingModel: operatingModel || 'single_outlet',
+        franchiseCode: generateFranchiseCode(territory || city || name),
+        royaltyPercent: investmentTier === 'flagship' ? 5 : investmentTier === 'growth' ? 6 : 8,
+        commissionRate: 15,
+        tier: 'gold',
+      } : {}),
     });
 
     res.status(201).json({

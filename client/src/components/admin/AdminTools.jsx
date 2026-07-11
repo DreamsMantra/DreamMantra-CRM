@@ -37,6 +37,9 @@ export function PartnerDetailModal({ partner, detail, open, onClose, onSave }) {
               <p className="text-xs font-semibold uppercase text-stone-500">Login Credentials</p>
               <p className="mt-1 font-mono text-lg font-bold text-gold-dark">{p.loginId || '—'}</p>
               <p className="text-sm text-stone-600">{p.email}</p>
+              {p.partnerType === 'franchise' && (
+                <p className="mt-2 text-sm text-orange">Franchise: {p.franchiseName} · {p.territory} · {p.franchiseCode}</p>
+              )}
             </div>
             <Field label="Name" value={f.name} onChange={(v) => setForm({ ...form, name: v })} />
             <Field label="Phone" value={f.phone} onChange={(v) => setForm({ ...form, phone: v })} />

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard, Users, IndianRupee, UserCircle, Plus, Search, Copy, CheckCircle,
   Clock, AlertCircle, Bell, BarChart3, Trophy, Calendar, Upload, CreditCard, Lock,
-  MessageCircle, Download, TrendingUp,
+  MessageCircle, Download, TrendingUp, Store,
 } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import StatCard from '../components/StatCard';
@@ -17,6 +17,7 @@ import FollowUpList from '../components/FollowUpList';
 import BulkLeadImport from '../components/BulkLeadImport';
 import ExportButton from '../components/ExportButton';
 import LeadComments from '../components/LeadComments';
+import FranchiseHub from '../components/FranchiseHub';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { LEAD_STATUSES, formatDate, formatCurrency, partnerTypeLabel, PARTNER_TIERS } from '../utils/constants';
@@ -64,7 +65,10 @@ export default function PartnerDashboard() {
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [phoneCheck, setPhoneCheck] = useState(null);
 
-  const sidebarLinks = baseLinks.map((l) => ({
+  const sidebarLinks = [
+    ...baseLinks,
+    ...(user?.partnerType === 'franchise' ? [{ to: '/partner?tab=franchise', label: 'Franchise Hub', icon: Store }] : []),
+  ].map((l) => ({
     ...l,
     badge: l.label === 'Notifications' ? notifications.unread : l.label === 'Follow-ups' ? followUps.overdue?.length : 0,
   }));
@@ -447,6 +451,10 @@ export default function PartnerDashboard() {
           <div><label className="dm-label">Confirm Password</label><input type="password" className="dm-input" value={passwordForm.confirm} onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })} required /></div>
           <button type="submit" className="dm-btn-primary">Update Password</button>
         </form>
+      )}
+
+      {tab === 'franchise' && user?.partnerType === 'franchise' && (
+        <FranchiseHub onRefresh={load} />
       )}
 
       {tab === 'notifications' && (

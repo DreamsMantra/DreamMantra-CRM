@@ -19,6 +19,28 @@ export const PARTNER_TYPES = [
   { value: 'coaching_center', label: 'Coaching Center' },
   { value: 'influencer', label: 'Influencer' },
   { value: 'counsellor', label: 'Counsellor' },
+  { value: 'franchise', label: 'Franchise Partner' },
+];
+
+export const FRANCHISE_INVESTMENT_TIERS = [
+  { value: 'starter', label: 'Starter (₹5–10L)', royalty: 8, leadTarget: 30 },
+  { value: 'growth', label: 'Growth (₹10–25L)', royalty: 6, leadTarget: 60 },
+  { value: 'flagship', label: 'Flagship (₹25L+)', royalty: 5, leadTarget: 100 },
+];
+
+export const FRANCHISE_OPERATING_MODELS = [
+  { value: 'single_outlet', label: 'Single Outlet' },
+  { value: 'multi_outlet', label: 'Multi Outlet' },
+  { value: 'master_franchise', label: 'Master Franchise (City Rights)' },
+];
+
+export const FRANCHISE_ONBOARDING_STEPS = [
+  { key: 'agreementSigned', label: 'Franchise agreement signed' },
+  { key: 'trainingCompleted', label: 'Counsellor training completed' },
+  { key: 'brandingSetup', label: 'Branding & centre setup done' },
+  { key: 'firstLeadSubmitted', label: 'First student lead submitted' },
+  { key: 'payoutDetailsAdded', label: 'Payout details added' },
+  { key: 'launchEventDone', label: 'Launch event / orientation done' },
 ];
 
 export const LEAD_STATUSES = [
@@ -50,6 +72,10 @@ export const INDIAN_STATES = [
   'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh',
   'Uttarakhand', 'West Bengal', 'Delhi', 'Jammu and Kashmir', 'Ladakh',
 ];
+
+export function franchiseTierMeta(tier) {
+  return FRANCHISE_INVESTMENT_TIERS.find((t) => t.value === tier) || FRANCHISE_INVESTMENT_TIERS[0];
+}
 
 export function partnerTypeLabel(type) {
   return PARTNER_TYPES.find((p) => p.value === type)?.label || type;

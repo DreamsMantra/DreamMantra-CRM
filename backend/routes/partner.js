@@ -13,6 +13,23 @@ router.patch('/welcome-seen', (req, res) => {
   res.json({ user: db.userToSafeJSON(user) });
 });
 
+router.patch('/franchise-onboarding', activePartnerOnly, (req, res) => {
+  if (req.user.partnerType !== 'franchise') {
+    return res.status(403).json({ message: 'Franchise hub is only for franchise partners' });
+  }
+  const updated = db.updateFranchiseOnboarding(req.user.id, req.body);
+  res.json({ onboarding: updated.franchiseOnboarding });
+});
+
+router.get('/franchise-hub', activePartnerOnly, (req, res) => {
+  if (req.user.partnerType !== 'franchise') {
+    return res.status(403).json({ message: 'Franchise hub is only for franchise partners' });
+  }
+  const data = db.getFranchiseHubData(req.user.id);
+  if (!data) return res.status(404).json({ message: 'Franchise data not found' });
+  res.json(data);
+});
+
 router.get('/dashboard', activePartnerOnly, (req, res) => {
   const leads = db.getLeads({ partnerId: req.user.id });
   const commissions = db.getCommissions({ partnerId: req.user.id });

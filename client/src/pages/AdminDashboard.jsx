@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, IndianRupee, Plus, Search, CheckCircle, AlertCircle,
   UserPlus, TrendingUp, BarChart3, Activity, Megaphone, Settings, Calendar,
-  Database, Bell, Copy, Trash2, Send, Shield, Columns3, Sparkles,
+  Database, Bell, Copy, Trash2, Send, Shield, Columns3, Sparkles, Store,
 } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import StatCard from '../components/StatCard';
@@ -23,11 +23,12 @@ import CredentialsModal from '../components/CredentialsModal';
 import { PartnerDetailModal, PartnerRowActions, BulkActionBar, SelectCheckbox } from '../components/admin/AdminTools';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { PARTNER_TYPES, PARTNER_TIERS, LEAD_STATUSES, formatDate, formatCurrency, partnerTypeLabel } from '../utils/constants';
+import { PARTNER_TYPES, PARTNER_TIERS, LEAD_STATUSES, FRANCHISE_INVESTMENT_TIERS, FRANCHISE_OPERATING_MODELS, formatDate, formatCurrency, partnerTypeLabel } from '../utils/constants';
 
 const baseLinks = [
   { to: '/admin', label: 'Command Center', icon: LayoutDashboard, end: true },
   { to: '/admin?tab=partners', label: 'Partners', icon: Users },
+  { to: '/admin?tab=franchises', label: 'Franchises', icon: Store },
   { to: '/admin?tab=leads', label: 'All Leads', icon: ClipboardList },
   { to: '/admin?tab=kanban', label: 'Lead Board', icon: Columns3 },
   { to: '/admin?tab=duplicates', label: 'Duplicates', icon: Copy },
@@ -43,7 +44,7 @@ const baseLinks = [
 
 const LOGIN_PREFIX = {
   referral_partner: 'REF', teacher: 'TCH', school: 'SCH', college: 'COL',
-  coaching_center: 'CCH', influencer: 'INF', counsellor: 'CNS',
+  coaching_center: 'CCH', influencer: 'INF', counsellor: 'CNS', franchise: 'FRN',
 };
 
 function suggestLoginId(partnerType) {
@@ -56,6 +57,8 @@ const emptyPartner = {
   name: '', email: '', phone: '', loginId: '', password: '', partnerType: 'teacher',
   organization: '', city: '', state: '', address: '', commissionRate: 10,
   status: 'active', tier: 'bronze', notes: '',
+  franchiseName: '', territory: '', outletCount: 1, investmentTier: 'starter',
+  operatingModel: 'single_outlet', royaltyPercent: 8, agreementDate: '',
 };
 
 const SETTINGS_FIELDS = [
@@ -82,6 +85,7 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState({});
   const [systemStats, setSystemStats] = useState(null);
   const [duplicates, setDuplicates] = useState([]);
+  const [franchises, setFranchises] = useState([]);
   const [partners, setPartners] = useState([]);
   const [leads, setLeads] = useState([]);
   const [commissions, setCommissions] = useState([]);
@@ -154,6 +158,10 @@ export default function AdminDashboard() {
         const sys = await api.admin.system();
         setSettings(sys.settings);
         setSystemStats(sys.stats);
+      }
+      if (tab === 'franchises' || tab === 'overview') {
+        const fr = await api.admin.franchises();
+        setFranchises(fr.franchises || []);
       }
     } catch (err) { fail(err); }
   }, [tab, partnerFilter, partnerTypeFilter, leadFilter, leadPartnerFilter, leadPriorityFilter, search]);
@@ -235,12 +243,15 @@ export default function AdminDashboard() {
     load();
   };
 
-  const openPartnerCreate = () => {
+  const openPartnerCreate = (asFranchise = false) => {
     setEditingPartner(null);
+    const type = asFranchise ? 'franchise' : emptyPartner.partnerType;
     setPartnerForm({
       ...emptyPartner,
-      loginId: suggestLoginId(emptyPartner.partnerType),
+      partnerType: type,
+      loginId: suggestLoginId(type),
       password: 'Partner@123',
+      ...(asFranchise ? { commissionRate: 15, tier: 'gold', royaltyPercent: 8 } : {}),
     });
     setPartnerModal(true);
   };
@@ -270,7 +281,8 @@ export default function AdminDashboard() {
         <div className="space-y-6">
           <div className="dm-card flex flex-wrap gap-3 p-4">
             <span className="flex items-center gap-2 text-sm font-semibold text-stone-700"><Shield className="h-4 w-4 text-gold" /> Quick Actions:</span>
-            <button type="button" className="dm-btn-primary text-xs" onClick={openPartnerCreate}><UserPlus className="h-3 w-3" /> Add Partner</button>
+            <button type="button" className="dm-btn-primary text-xs" onClick={() => openPartnerCreate(false)}><UserPlus className="h-3 w-3" /> Add Partner</button>
+            <button type="button" className="dm-btn-gold text-xs" onClick={() => openPartnerCreate(true)}><Store className="h-3 w-3" /> Add Franchise</button>
             <button type="button" className="dm-btn-ghost text-xs" onClick={() => setParams({ tab: 'kanban' })}><Columns3 className="h-3 w-3" /> Lead Board</button>
             <button type="button" className="dm-btn-ghost text-xs" onClick={async () => { const pending = partners.filter((p) => p.status === 'pending'); if (pending.length) { await api.admin.bulkPartners(pending.map((p) => p.id), 'approve'); flash(`Approved ${pending.length} partners`); load(); } }}>Approve All Pending</button>
             <button type="button" className="dm-btn-ghost text-xs" onClick={() => setParams({ tab: 'duplicates' })}>View Duplicates ({duplicates.length})</button>
@@ -364,8 +376,9 @@ export default function AdminDashboard() {
                     <td><SelectCheckbox checked={selectedPartners.includes(p.id)} onChange={() => setSelectedPartners((s) => s.includes(p.id) ? s.filter((x) => x !== p.id) : [...s, p.id])} /></td>
                     <td>
                       <p className="font-semibold">{p.name}</p>
-                      <p className="font-mono text-xs font-semibold text-gold-dark">{p.loginId || '—'}</p>
-                      <p className="text-xs text-stone-400">{p.email}</p>
+              <p className="font-mono text-xs font-semibold text-gold-dark">{p.loginId || '—'}</p>
+              <p className="text-xs text-stone-400">{p.email}</p>
+              {p.partnerType === 'franchise' && <p className="text-xs text-orange">{p.territory || p.franchiseName}</p>}
                     </td>
                     <td>{partnerTypeLabel(p.partnerType)}</td>
                     <td className="capitalize">{p.tier || 'bronze'}</td>
@@ -382,6 +395,46 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* ─── FRANCHISES ─── */}
+      {tab === 'franchises' && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-display text-xl font-bold text-stone-900">Franchise Network</h2>
+              <p className="text-sm text-stone-500">{franchises.length} franchise partner{franchises.length !== 1 ? 's' : ''} · {systemStats?.franchises ?? franchises.length} total</p>
+            </div>
+            <button type="button" onClick={() => openPartnerCreate(true)} className="dm-btn-gold"><Store className="h-4 w-4" /> New Franchise</button>
+          </div>
+          {franchises.length === 0 ? (
+            <div className="dm-card p-12 text-center text-stone-400">No franchise partners yet. Create one or approve franchise applications.</div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {franchises.map((f) => (
+                <div key={f.id} className="dm-card p-5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="dm-badge bg-gold/15 text-gold-dark">{f.franchiseCode || 'FRN'}</span>
+                      <h3 className="mt-2 font-display font-bold text-stone-900">{f.franchiseName || f.name}</h3>
+                      <p className="text-sm text-stone-500">{f.territory || f.city} · {f.outletCount || 1} outlet(s)</p>
+                    </div>
+                    <span className={`dm-badge capitalize ${f.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{f.status}</span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="rounded-lg bg-stone-50 p-2"><p className="font-bold text-stone-900">{f.stats?.totalLeads || 0}</p><p className="text-stone-400">Leads</p></div>
+                    <div className="rounded-lg bg-stone-50 p-2"><p className="font-bold text-emerald-600">{f.stats?.conversionRate || 0}%</p><p className="text-stone-400">Conv.</p></div>
+                    <div className="rounded-lg bg-stone-50 p-2"><p className="font-bold text-gold-dark">{f.stats?.onboardingProgress || 0}%</p><p className="text-stone-400">Onboard</p></div>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <button type="button" onClick={() => viewPartnerDetail(f)} className="dm-btn-ghost flex-1 text-xs">View</button>
+                    <button type="button" onClick={() => { setEditingPartner(f); setPartnerForm({ ...f, password: '' }); setPartnerModal(true); }} className="dm-btn-primary flex-1 text-xs">Edit</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -668,10 +721,30 @@ export default function AdminDashboard() {
                 <input className="dm-input" type="text" value={partnerForm.password} onChange={(e) => setPartnerForm({ ...partnerForm, password: e.target.value })} placeholder="Min 6 characters" required minLength={6} />
               </div>
             )}
-            <div><label className="dm-label">Type</label><select className="dm-input" value={partnerForm.partnerType} onChange={(e) => setPartnerForm({ ...partnerForm, partnerType: e.target.value })}>{PARTNER_TYPES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select></div>
+            <div><label className="dm-label">Type</label><select className="dm-input" value={partnerForm.partnerType} onChange={(e) => {
+              const type = e.target.value;
+              setPartnerForm({
+                ...partnerForm,
+                partnerType: type,
+                loginId: !editingPartner ? suggestLoginId(type) : partnerForm.loginId,
+                ...(type === 'franchise' ? { commissionRate: 15, tier: 'gold', royaltyPercent: 8 } : {}),
+              });
+            }}>{PARTNER_TYPES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select></div>
             <div><label className="dm-label">Tier</label><select className="dm-input" value={partnerForm.tier} onChange={(e) => setPartnerForm({ ...partnerForm, tier: e.target.value })}>{PARTNER_TIERS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
             <div><label className="dm-label">Commission %</label><input type="number" className="dm-input" value={partnerForm.commissionRate} onChange={(e) => setPartnerForm({ ...partnerForm, commissionRate: Number(e.target.value) })} /></div>
             <div><label className="dm-label">Status</label><select className="dm-input" value={partnerForm.status} onChange={(e) => setPartnerForm({ ...partnerForm, status: e.target.value })}>{['pending', 'active', 'suspended', 'rejected'].map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
+            {partnerForm.partnerType === 'franchise' && (
+              <>
+                <div className="sm:col-span-2 rounded-xl border border-gold/20 bg-gold/5 p-4 text-sm font-semibold text-gold-dark">Franchise Details</div>
+                <div><label className="dm-label">Franchise Name</label><input className="dm-input" value={partnerForm.franchiseName} onChange={(e) => setPartnerForm({ ...partnerForm, franchiseName: e.target.value })} /></div>
+                <div><label className="dm-label">Territory</label><input className="dm-input" value={partnerForm.territory} onChange={(e) => setPartnerForm({ ...partnerForm, territory: e.target.value })} /></div>
+                <div><label className="dm-label">Outlets</label><input type="number" min={1} className="dm-input" value={partnerForm.outletCount} onChange={(e) => setPartnerForm({ ...partnerForm, outletCount: Number(e.target.value) })} /></div>
+                <div><label className="dm-label">Investment Tier</label><select className="dm-input" value={partnerForm.investmentTier} onChange={(e) => setPartnerForm({ ...partnerForm, investmentTier: e.target.value })}>{FRANCHISE_INVESTMENT_TIERS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
+                <div><label className="dm-label">Operating Model</label><select className="dm-input" value={partnerForm.operatingModel} onChange={(e) => setPartnerForm({ ...partnerForm, operatingModel: e.target.value })}>{FRANCHISE_OPERATING_MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></div>
+                <div><label className="dm-label">Royalty %</label><input type="number" className="dm-input" value={partnerForm.royaltyPercent} onChange={(e) => setPartnerForm({ ...partnerForm, royaltyPercent: Number(e.target.value) })} /></div>
+                <div><label className="dm-label">Agreement Date</label><input type="date" className="dm-input" value={partnerForm.agreementDate} onChange={(e) => setPartnerForm({ ...partnerForm, agreementDate: e.target.value })} /></div>
+              </>
+            )}
             <div className="sm:col-span-2"><label className="dm-label">Admin Notes</label><textarea className="dm-input" value={partnerForm.notes} onChange={(e) => setPartnerForm({ ...partnerForm, notes: e.target.value })} /></div>
           </div>
           <button type="submit" className="dm-btn-primary w-full">{editingPartner ? 'Save Changes' : 'Create Partner & Get Credentials'}</button>

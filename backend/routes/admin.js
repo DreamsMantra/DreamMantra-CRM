@@ -4,7 +4,7 @@ import * as db from '../lib/db.js';
 import { PARTNER_TYPES } from '../lib/db.js';
 import { LEAD_STATUSES } from '../models/Lead.js';
 import { authRequired, loadUser, adminOnly } from '../middleware/auth.js';
-import { generateReferralCode, generateLeadId, notifyUser, partnerTypeLabel, generateLoginId, isValidLoginId, normalizeLoginId } from '../utils/helpers.js';
+import { generateReferralCode, generateLeadId, notifyUser, partnerTypeLabel, generateLoginId, isValidLoginId, normalizeLoginId, generateFranchiseCode } from '../utils/helpers.js';
 
 const router = Router();
 
@@ -78,6 +78,7 @@ router.post('/partners', async (req, res) => {
   const {
     name, email, phone, password, loginId: rawLoginId, partnerType, organization,
     city, state, address, commissionRate, status, notes,
+    franchiseName, territory, outletCount, investmentTier, operatingModel, royaltyPercent, agreementDate,
   } = req.body;
 
   if (!name?.trim() || !email?.trim() || !partnerType || !password) {
@@ -121,12 +122,22 @@ router.post('/partners', async (req, res) => {
     address: address?.trim() || '',
     referralCode,
     status: status || 'active',
-    commissionRate: Number(commissionRate) || 10,
-    tier: req.body.tier || 'bronze',
+    commissionRate: partnerType === 'franchise' ? (Number(commissionRate) || 15) : (Number(commissionRate) || 10),
+    tier: partnerType === 'franchise' ? (req.body.tier || 'gold') : (req.body.tier || 'bronze'),
     notes: notes?.trim() || '',
     createdBy: req.user.id,
     accountCreatedByAdmin: true,
     welcomePending: true,
+    ...(partnerType === 'franchise' ? {
+      franchiseName: franchiseName?.trim() || organization?.trim() || name.trim(),
+      territory: territory?.trim() || city?.trim() || '',
+      outletCount: Number(outletCount) || 1,
+      investmentTier: investmentTier || 'starter',
+      operatingModel: operatingModel || 'single_outlet',
+      franchiseCode: generateFranchiseCode(territory || city || name),
+      royaltyPercent: Number(royaltyPercent) || (investmentTier === 'flagship' ? 5 : investmentTier === 'growth' ? 6 : 8),
+      agreementDate: agreementDate || new Date().toISOString().slice(0, 10),
+    } : {}),
   });
 
   db.logActivity({
@@ -165,10 +176,12 @@ router.patch('/partners/:id', async (req, res) => {
 
   const prevStatus = partner.status;
   const updates = {};
-  const fields = ['name', 'phone', 'partnerType', 'organization', 'city', 'state', 'address', 'status', 'notes', 'tier', 'documentsVerified', 'bankAccount', 'ifsc', 'upiId', 'panNumber'];
+  const fields = ['name', 'phone', 'partnerType', 'organization', 'city', 'state', 'address', 'status', 'notes', 'tier', 'documentsVerified', 'bankAccount', 'ifsc', 'upiId', 'panNumber', 'franchiseName', 'territory', 'investmentTier', 'operatingModel', 'agreementDate'];
   fields.forEach((f) => {
     if (req.body[f] !== undefined) updates[f] = req.body[f];
   });
+  if (req.body.outletCount !== undefined) updates.outletCount = Number(req.body.outletCount);
+  if (req.body.royaltyPercent !== undefined) updates.royaltyPercent = Number(req.body.royaltyPercent);
   if (req.body.loginId !== undefined) {
     const loginId = normalizeLoginId(req.body.loginId);
     if (!isValidLoginId(loginId)) {
@@ -578,6 +591,10 @@ router.post('/notify', async (req, res) => {
 
 router.get('/duplicates', (_req, res) => {
   res.json({ groups: db.getAllDuplicateGroups() });
+});
+
+router.get('/franchises', (_req, res) => {
+  res.json({ franchises: db.getFranchises() });
 });
 
 router.get('/search', (req, res) => {

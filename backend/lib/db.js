@@ -5,7 +5,7 @@ import { generateReferralCode, generateLoginId, normalizeLoginId } from '../util
 export const PARTNER_TIERS = ['bronze', 'silver', 'gold', 'platinum'];
 
 export const PARTNER_TYPES = [
-  'referral_partner', 'teacher', 'school', 'college', 'coaching_center', 'influencer', 'counsellor',
+  'referral_partner', 'teacher', 'school', 'college', 'coaching_center', 'influencer', 'counsellor', 'franchise',
 ];
 
 export function userToSafeJSON(user) {
@@ -103,6 +103,22 @@ export function createUser(data) {
     upiId: data.upiId || '',
     panNumber: data.panNumber || '',
     documentsVerified: false,
+    franchiseName: data.franchiseName || '',
+    territory: data.territory || '',
+    outletCount: data.outletCount || 1,
+    investmentTier: data.investmentTier || 'starter',
+    franchiseCode: data.franchiseCode || '',
+    royaltyPercent: data.royaltyPercent ?? 8,
+    operatingModel: data.operatingModel || 'single_outlet',
+    agreementDate: data.agreementDate || '',
+    franchiseOnboarding: data.franchiseOnboarding || {
+      agreementSigned: false,
+      trainingCompleted: false,
+      brandingSetup: false,
+      firstLeadSubmitted: false,
+      payoutDetailsAdded: false,
+      launchEventDone: false,
+    },
     createdAt: now(),
     updatedAt: now(),
   };
@@ -553,10 +569,98 @@ export function getSystemStats() {
   return {
     users: store.users.length,
     partners: store.users.filter((u) => u.role === 'partner').length,
+    franchises: store.users.filter((u) => u.role === 'partner' && u.partnerType === 'franchise').length,
     leads: store.leads.length,
     commissions: store.commissions.length,
     notifications: store.notifications.length,
     activities: store.activities.length,
     announcements: store.announcements.length,
   };
+}
+
+export function getFranchises() {
+  return queryUsers({ partnerType: 'franchise' }).map((f) => {
+    const leads = getLeads({ partnerId: f.id });
+    const commissions = getCommissions({ partnerId: f.id });
+    const converted = leads.filter((l) => l.status === 'converted').length;
+    const paid = commissions.filter((c) => c.status === 'paid').reduce((s, c) => s + c.amount, 0);
+    const onboarding = f.franchiseOnboarding || {};
+    const stepsDone = Object.values(onboarding).filter(Boolean).length;
+    return {
+      ...userToSafeJSON(f),
+      stats: {
+        totalLeads: leads.length,
+        converted,
+        conversionRate: leads.length ? Math.round((converted / leads.length) * 100) : 0,
+        totalEarnings: paid,
+        onboardingProgress: Math.round((stepsDone / 6) * 100),
+      },
+    };
+  });
+}
+
+export function getFranchiseHubData(partnerId) {
+  const partner = findUser({ id: partnerId });
+  if (!partner || partner.partnerType !== 'franchise') return null;
+
+  const leads = getLeads({ partnerId });
+  const commissions = getCommissions({ partnerId });
+  const converted = leads.filter((l) => l.status === 'converted').length;
+  const paid = commissions.filter((c) => c.status === 'paid').reduce((s, c) => s + c.amount, 0);
+  const pending = commissions.filter((c) => c.status === 'pending' || c.status === 'approved').reduce((s, c) => s + c.amount, 0);
+
+  const tierTargets = { starter: 30, growth: 60, flagship: 100 };
+  const monthlyTarget = tierTargets[partner.investmentTier] || 30;
+  const nowDate = new Date();
+  const monthLeads = leads.filter((l) => {
+    const d = new Date(l.createdAt);
+    return d.getMonth() === nowDate.getMonth() && d.getFullYear() === nowDate.getFullYear();
+  }).length;
+
+  let onboarding = { ...(partner.franchiseOnboarding || {}) };
+  if (leads.length > 0) onboarding.firstLeadSubmitted = true;
+  if (partner.bankAccount || partner.upiId) onboarding.payoutDetailsAdded = true;
+  const stepsDone = Object.values(onboarding).filter(Boolean).length;
+
+  const monthlyTrend = getMonthlyTrends(6).map((m) => ({
+    ...m,
+    franchiseLeads: leads.filter((l) => {
+      const d = new Date(l.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return key === m.month;
+    }).length,
+  }));
+
+  return {
+    partner: userToSafeJSON({ ...partner, franchiseOnboarding: onboarding }),
+    territory: partner.territory || partner.city || '—',
+    stats: {
+      totalLeads: leads.length,
+      converted,
+      conversionRate: leads.length ? Math.round((converted / leads.length) * 100) : 0,
+      monthLeads,
+      monthlyTarget,
+      targetProgress: Math.min(100, Math.round((monthLeads / monthlyTarget) * 100)),
+      paidCommission: paid,
+      pendingCommission: pending,
+      outletCount: partner.outletCount || 1,
+      royaltyPercent: partner.royaltyPercent ?? 8,
+      onboardingProgress: Math.round((stepsDone / 6) * 100),
+    },
+    onboarding,
+    monthlyTrend,
+    marketingKit: [
+      { title: 'Brand Guidelines PDF', type: 'document', url: '#' },
+      { title: 'Centre Launch Checklist', type: 'document', url: '#' },
+      { title: 'Social Media Templates', type: 'media', url: '#' },
+      { title: 'Parent Orientation Deck', type: 'presentation', url: '#' },
+    ],
+  };
+}
+
+export function updateFranchiseOnboarding(partnerId, updates) {
+  const partner = findUser({ id: partnerId });
+  if (!partner || partner.partnerType !== 'franchise') return null;
+  const onboarding = { ...(partner.franchiseOnboarding || {}), ...updates };
+  return updateUser(partnerId, { franchiseOnboarding: onboarding });
 }

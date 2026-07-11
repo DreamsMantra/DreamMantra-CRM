@@ -49,11 +49,14 @@ export const api = {
     exportLeads: (params = {}) => `/api/partner/export/leads?${new URLSearchParams(params)}`,
     payoutDetails: (body) => request('/partner/payout-details', { method: 'PUT', body: JSON.stringify(body) }),
     dismissWelcome: () => request('/partner/welcome-seen', { method: 'PATCH' }),
+    franchiseHub: () => request('/partner/franchise-hub'),
+    updateFranchiseOnboarding: (body) => request('/partner/franchise-onboarding', { method: 'PATCH', body: JSON.stringify(body) }),
   },
 
   admin: {
     dashboard: () => request('/admin/dashboard'),
     search: (q) => request(`/admin/search?q=${encodeURIComponent(q)}`),
+    franchises: () => request('/admin/franchises'),
     system: () => request('/admin/system'),
     duplicates: () => request('/admin/duplicates'),
 
