@@ -96,15 +96,15 @@ export async function initStore() {
     const doc = await CrmStore.findById('main').lean();
     if (doc?.data) {
       memoryStore = normalizeStore(doc.data);
-      console.log('✓ CRM data loaded from MongoDB Atlas');
+      console.log('✓ CRM data loaded from MongoDB');
     } else if (fs.existsSync(STORE_FILE)) {
       memoryStore = loadFromFile();
       await persistToMongo(memoryStore);
-      console.log('✓ Migrated local store.json → MongoDB Atlas');
+      console.log('✓ Migrated local store.json → MongoDB');
     } else {
       memoryStore = normalizeStore(defaultStore);
       await persistToMongo(memoryStore);
-      console.log('✓ Initialized new CRM database on MongoDB Atlas');
+      console.log('✓ Initialized new CRM database on MongoDB');
     }
     storageMode = 'mongodb';
   } else {

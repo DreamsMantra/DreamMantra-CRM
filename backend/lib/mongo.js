@@ -19,7 +19,8 @@ export async function connectMongo() {
 
   connected = true;
   const { host, name } = mongoose.connection;
-  console.log(`✓ MongoDB Atlas connected (${host} / ${name})`);
+  const label = host?.includes('mongodb.net') ? 'MongoDB Atlas' : 'MongoDB';
+  console.log(`✓ ${label} connected (${host} / ${name})`);
   return mongoose.connection;
 }
 
