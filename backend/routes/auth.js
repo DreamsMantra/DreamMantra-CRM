@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import * as db from '../lib/db.js';
-import { PARTNER_TYPES } from '../lib/db.js';
 import { signToken, authRequired, loadUser } from '../middleware/auth.js';
 import { generateReferralCode, generateLoginId, isValidLoginId, normalizeLoginId, generateFranchiseCode } from '../utils/helpers.js';
 
 const router = Router();
+
+router.get('/forms/:name', (req, res) => {
+  const templates = db.getFormTemplates();
+  const form = templates[req.params.name];
+  if (!form) return res.status(404).json({ message: 'Form not found' });
+  res.json({ fields: form.filter((f) => f.enabled !== false) });
+});
 
 router.post('/register', async (req, res) => {
   try {
@@ -14,7 +20,7 @@ router.post('/register', async (req, res) => {
     if (!name?.trim() || !email?.trim() || !password || !partnerType) {
       return res.status(400).json({ message: 'Name, email, password and partner type are required' });
     }
-    if (!PARTNER_TYPES.includes(partnerType)) {
+    if (!db.PARTNER_TYPES.includes(partnerType)) {
       return res.status(400).json({ message: 'Invalid partner type' });
     }
     if (password.length < 6) {

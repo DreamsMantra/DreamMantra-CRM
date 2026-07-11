@@ -194,6 +194,12 @@ router.patch('/partners/:id', async (req, res) => {
     updates.loginId = loginId;
   }
   if (req.body.commissionRate !== undefined) updates.commissionRate = Number(req.body.commissionRate);
+  if (req.body.email !== undefined) {
+    const email = req.body.email.trim().toLowerCase();
+    const taken = db.findUser({ email });
+    if (taken && taken.id !== partner.id) return res.status(409).json({ message: 'Email already in use' });
+    updates.email = email;
+  }
   if (req.body.totalLeads !== undefined) updates.totalLeads = Number(req.body.totalLeads);
   if (req.body.convertedLeads !== undefined) updates.convertedLeads = Number(req.body.convertedLeads);
   if (req.body.totalEarnings !== undefined) updates.totalEarnings = Number(req.body.totalEarnings);
@@ -631,6 +637,102 @@ router.get('/export/commissions', (_req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=commissions.csv');
   res.send(db.exportCommissionsCSV());
+});
+
+router.get('/export/registrations', (req, res) => {
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=registrations.csv');
+  res.send(db.exportRegistrationsCSV({ status: req.query.status }));
+});
+
+router.get('/export/activities', (_req, res) => {
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=activity-log.csv');
+  res.send(db.exportActivitiesCSV());
+});
+
+router.get('/export/announcements', (_req, res) => {
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=announcements.csv');
+  res.send(db.exportAnnouncementsCSV());
+});
+
+router.get('/export/backup', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename=dreammantra-crm-backup-${Date.now()}.json`);
+  res.json(db.exportFullBackup());
+});
+
+// ─── Form templates ───
+router.get('/forms', (_req, res) => {
+  res.json({ templates: db.getFormTemplates() });
+});
+
+router.put('/forms', (req, res) => {
+  const templates = db.updateFormTemplates(req.body.templates || req.body);
+  db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'forms_updated', entityType: 'settings', details: 'Form templates saved' });
+  res.json({ templates });
+});
+
+// ─── Registrations (partner signups) ───
+router.get('/registrations', (req, res) => {
+  const { status } = req.query;
+  res.json({ registrations: db.getRegistrations({ status: status || 'all' }) });
+});
+
+router.put('/registrations/:id', async (req, res) => {
+  const partner = db.findUser({ id: req.params.id });
+  if (!partner || partner.role !== 'partner') return res.status(404).json({ message: 'Registration not found' });
+  const updates = {};
+  const fields = ['name', 'phone', 'partnerType', 'organization', 'city', 'state', 'address', 'status', 'notes', 'franchiseName', 'territory', 'investmentTier', 'operatingModel'];
+  fields.forEach((f) => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
+  if (req.body.email) {
+    const email = req.body.email.trim().toLowerCase();
+    const taken = db.findUser({ email });
+    if (taken && taken.id !== partner.id) return res.status(409).json({ message: 'Email already in use' });
+    updates.email = email;
+  }
+  if (req.body.outletCount !== undefined) updates.outletCount = Number(req.body.outletCount);
+  const updated = db.updateUser(partner.id, updates);
+  db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'registration_edited', entityType: 'partner', entityId: partner.id });
+  res.json({ registration: db.userToSafeJSON(updated) });
+});
+
+router.delete('/registrations/:id', (req, res) => {
+  const partner = db.deletePartner(req.params.id);
+  if (!partner) return res.status(404).json({ message: 'Registration not found' });
+  db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'registration_deleted', entityType: 'partner', entityId: req.params.id });
+  res.json({ ok: true });
+});
+
+// ─── Comments & notifications ───
+router.get('/comments', (_req, res) => {
+  res.json({ comments: db.getAllComments() });
+});
+
+router.patch('/comments/:id', (req, res) => {
+  const comment = db.updateLeadComment(req.params.id, { message: req.body.message, isInternal: req.body.isInternal });
+  if (!comment) return res.status(404).json({ message: 'Comment not found' });
+  res.json({ comment });
+});
+
+router.delete('/comments/:id', (req, res) => {
+  if (!db.deleteLeadComment(req.params.id)) return res.status(404).json({ message: 'Comment not found' });
+  res.json({ ok: true });
+});
+
+router.get('/notifications', (_req, res) => {
+  res.json({ notifications: db.getAllNotifications() });
+});
+
+router.delete('/notifications/:id', (req, res) => {
+  db.deleteNotification(req.params.id);
+  res.json({ ok: true });
+});
+
+router.delete('/activities', (req, res) => {
+  db.clearActivities();
+  res.json({ ok: true, message: 'Activity log cleared' });
 });
 
 router.post('/leads/bulk', (req, res) => {

@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { loadStore, saveStore, newId, now, findById, sortByDate } from '../lib/store.js';
-import { generateReferralCode, generateLoginId, normalizeLoginId } from '../utils/helpers.js';
+import { DEFAULT_FORM_TEMPLATES } from '../data/formDefaults.js';
 
 export const PARTNER_TIERS = ['bronze', 'silver', 'gold', 'platinum'];
 
@@ -326,6 +326,118 @@ export function addLeadComment({ leadId, userId, userName, role, message, isInte
   store.leadComments.push(comment);
   saveStore(store);
   return comment;
+}
+
+export function getFormTemplates() {
+  const settings = getSettings();
+  const saved = settings.formTemplates || {};
+  const merged = {};
+  for (const [form, defaults] of Object.entries(DEFAULT_FORM_TEMPLATES)) {
+    const savedFields = saved[form] || [];
+    const savedMap = Object.fromEntries(savedFields.map((f) => [f.key, f]));
+    merged[form] = defaults.map((d) => ({ ...d, ...savedMap[d.key] }));
+  }
+  return merged;
+}
+
+export function updateFormTemplates(templates) {
+  const store = loadStore();
+  store.settings = { ...store.settings, formTemplates: templates };
+  saveStore(store);
+  return getFormTemplates();
+}
+
+export function getRegistrations(filter = {}) {
+  let users = getUsers().filter((u) => u.role === 'partner');
+  if (filter.status && filter.status !== 'all') users = users.filter((u) => u.status === filter.status);
+  return sortByDate(users.map(userToSafeJSON));
+}
+
+export function getAllComments() {
+  return sortByDate(loadStore().leadComments).map((c) => {
+    const lead = findLead(c.leadId);
+    return { ...c, lead: lead ? { id: lead.id, leadId: lead.leadId, studentName: lead.studentName } : null };
+  });
+}
+
+export function updateLeadComment(id, updates) {
+  const store = loadStore();
+  const idx = store.leadComments.findIndex((c) => c.id === id);
+  if (idx === -1) return null;
+  store.leadComments[idx] = { ...store.leadComments[idx], ...updates };
+  saveStore(store);
+  return store.leadComments[idx];
+}
+
+export function deleteLeadComment(id) {
+  const store = loadStore();
+  const before = store.leadComments.length;
+  store.leadComments = store.leadComments.filter((c) => c.id !== id);
+  saveStore(store);
+  return before !== store.leadComments.length;
+}
+
+export function getAllNotifications() {
+  return sortByDate(loadStore().notifications).map((n) => {
+    const user = findUser({ id: n.userId });
+    return { ...n, userName: user?.name || 'Unknown' };
+  });
+}
+
+export function deleteNotification(id) {
+  const store = loadStore();
+  store.notifications = store.notifications.filter((n) => n.id !== id);
+  saveStore(store);
+}
+
+export function clearActivities() {
+  const store = loadStore();
+  store.activities = [];
+  saveStore(store);
+}
+
+function csvEscape(val) {
+  return `"${String(val ?? '').replace(/"/g, '""')}"`;
+}
+
+export function exportRegistrationsCSV(filter = {}) {
+  const regs = getRegistrations(filter);
+  const headers = ['Name', 'Email', 'Phone', 'Partner Type', 'Status', 'Organization', 'City', 'State', 'Login ID', 'Created'];
+  const rows = regs.map((r) => [
+    r.name, r.email, r.phone || '', r.partnerType, r.status, r.organization || '',
+    r.city || '', r.state || '', r.loginId || '', r.createdAt?.slice(0, 10) || '',
+  ]);
+  return [headers, ...rows].map((r) => r.map(csvEscape).join(',')).join('\n');
+}
+
+export function exportActivitiesCSV() {
+  const items = getActivities(500);
+  const headers = ['Date', 'User', 'Action', 'Entity', 'Details'];
+  const rows = items.map((a) => [
+    a.createdAt?.slice(0, 19) || '', a.userName, a.action, a.entityType, a.details || '',
+  ]);
+  return [headers, ...rows].map((r) => r.map(csvEscape).join(',')).join('\n');
+}
+
+export function exportAnnouncementsCSV() {
+  const items = getAnnouncements(false);
+  const headers = ['Title', 'Message', 'Active', 'Created'];
+  const rows = items.map((a) => [a.title, a.message, a.active !== false, a.createdAt?.slice(0, 10) || '']);
+  return [headers, ...rows].map((r) => r.map(csvEscape).join(',')).join('\n');
+}
+
+export function exportFullBackup() {
+  const store = loadStore();
+  const { users, ...rest } = store;
+  return {
+    exportedAt: now(),
+    users: users.map((u) => {
+      const { password, ...safe } = u;
+      return safe;
+    }),
+    ...rest,
+    formTemplates: getFormTemplates(),
+  };
 }
 
 // ─── Settings ───

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, IndianRupee, Plus, Search, CheckCircle, AlertCircle,
   UserPlus, TrendingUp, BarChart3, Activity, Megaphone, Settings, Calendar,
-  Database, Bell, Copy, Trash2, Send, Shield, Columns3, Sparkles, Store,
+  Database, Bell, Copy, Trash2, Send, Shield, Columns3, Sparkles, Store, SlidersHorizontal, Edit2,
 } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import StatCard from '../components/StatCard';
@@ -21,6 +21,7 @@ import LeadKanban from '../components/LeadKanban';
 import AdminGlobalSearch from '../components/AdminGlobalSearch';
 import CredentialsModal from '../components/CredentialsModal';
 import { PartnerDetailModal, PartnerRowActions, BulkActionBar, SelectCheckbox } from '../components/admin/AdminTools';
+import MasterControl from '../components/admin/MasterControl';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { PARTNER_TYPES, PARTNER_TIERS, LEAD_STATUSES, FRANCHISE_INVESTMENT_TIERS, FRANCHISE_OPERATING_MODELS, formatDate, formatCurrency, partnerTypeLabel } from '../utils/constants';
@@ -37,6 +38,7 @@ const baseLinks = [
   { to: '/admin?tab=reports', label: 'Reports', icon: BarChart3 },
   { to: '/admin?tab=notify', label: 'Send Notification', icon: Bell },
   { to: '/admin?tab=data', label: 'Data & Import', icon: Database },
+  { to: '/admin?tab=master', label: 'Master Control', icon: SlidersHorizontal },
   { to: '/admin?tab=activity', label: 'Activity Log', icon: Activity },
   { to: '/admin?tab=announcements', label: 'Announcements', icon: Megaphone },
   { to: '/admin?tab=settings', label: 'CRM Settings', icon: Settings },
@@ -115,6 +117,8 @@ export default function AdminDashboard() {
   const [notifyForm, setNotifyForm] = useState({ partnerId: 'all', title: '', message: '', link: '' });
   const [commissionForm, setCommissionForm] = useState({ partnerId: '', leadId: '', amount: '', rate: 10, notes: '' });
   const [commissionModal, setCommissionModal] = useState(false);
+  const [editCommission, setEditCommission] = useState(null);
+  const [leadTemplateFields, setLeadTemplateFields] = useState([]);
   const [bulkImportPartner, setBulkImportPartner] = useState('');
 
   const [partnerFilter, setPartnerFilter] = useState('all');
@@ -133,6 +137,10 @@ export default function AdminDashboard() {
       : l.label === 'Partners' ? dashboard?.stats?.pendingPartners
       : l.label === 'Duplicates' ? duplicates.length : 0,
   }));
+
+  useEffect(() => {
+    api.auth.formTemplate('lead').then((r) => setLeadTemplateFields(r.fields || [])).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setError('');
@@ -285,7 +293,7 @@ export default function AdminDashboard() {
             <button type="button" className="dm-btn-gold text-xs" onClick={() => openPartnerCreate(true)}><Store className="h-3 w-3" /> Add Franchise</button>
             <button type="button" className="dm-btn-ghost text-xs" onClick={() => setParams({ tab: 'kanban' })}><Columns3 className="h-3 w-3" /> Lead Board</button>
             <button type="button" className="dm-btn-ghost text-xs" onClick={async () => { const pending = partners.filter((p) => p.status === 'pending'); if (pending.length) { await api.admin.bulkPartners(pending.map((p) => p.id), 'approve'); flash(`Approved ${pending.length} partners`); load(); } }}>Approve All Pending</button>
-            <button type="button" className="dm-btn-ghost text-xs" onClick={() => setParams({ tab: 'duplicates' })}>View Duplicates ({duplicates.length})</button>
+            <button type="button" className="dm-btn-ghost text-xs" onClick={() => setParams({ tab: 'master' })}><SlidersHorizontal className="h-3 w-3" /> Master Control</button>
             <ExportButton href={api.admin.exportLeads()} token={token} label="Export Leads" />
             <ExportButton href={api.admin.exportPartners()} token={token} label="Export Partners" />
           </div>
@@ -562,6 +570,7 @@ export default function AdminDashboard() {
                     <td className="font-semibold text-emerald-600">{formatCurrency(c.amount)}</td>
                     <td><span className="dm-badge bg-stone-100 capitalize">{c.status}</span></td>
                     <td className="space-x-2">
+                      <button type="button" onClick={() => setEditCommission({ ...c, id: c.id || c._id })} className="text-gold-dark"><Edit2 className="h-3 w-3 inline" /></button>
                       {c.status === 'pending' && <button type="button" onClick={() => api.admin.updateCommission(c.id || c._id, { status: 'approved' }).then(load)} className="text-xs text-blue-600">Approve</button>}
                       {c.status === 'approved' && <button type="button" onClick={() => api.admin.updateCommission(c.id || c._id, { status: 'paid' }).then(load)} className="dm-btn-primary text-xs py-1">Pay</button>}
                       <button type="button" onClick={async () => { if (confirm('Delete?')) { await api.admin.deleteCommission(c.id || c._id); load(); } }} className="text-xs text-red-600"><Trash2 className="h-3 w-3 inline" /></button>
@@ -610,12 +619,14 @@ export default function AdminDashboard() {
             <BulkLeadImport onImport={async (leadsData) => { if (!bulkImportPartner) { fail(new Error('Select a partner')); return; } const res = await api.admin.bulkLeads(bulkImportPartner, leadsData); flash(`Imported ${res.created} leads`); load(); }} />
           </div>
           <div className="dm-card p-6">
-            <h2 className="mb-4 dm-section-title">Export Data</h2>
+            <h2 className="mb-4 dm-section-title">Quick Export</h2>
             <div className="space-y-3">
               <ExportButton href={api.admin.exportLeads()} token={token} label="Export All Leads" />
               <ExportButton href={api.admin.exportPartners()} token={token} label="Export All Partners" />
               <ExportButton href={api.admin.exportCommissions()} token={token} label="Export Commissions" />
+              <ExportButton href={api.admin.exportBackup()} token={token} label="Full CRM Backup (JSON)" />
             </div>
+            <button type="button" onClick={() => setParams({ tab: 'master' })} className="dm-btn-gold mt-6 w-full">Open Master Control →</button>
             {systemStats && (
               <div className="mt-6 rounded-xl bg-stone-50 p-4">
                 <p className="mb-2 font-semibold text-stone-700">Database Stats</p>
@@ -626,6 +637,10 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+      )}
+
+      {tab === 'master' && (
+        <MasterControl token={token} onRefresh={load} flash={flash} fail={fail} />
       )}
 
       {tab === 'activity' && <div className="dm-card p-6"><h2 className="mb-4 dm-section-title">Full Activity Log</h2><ActivityFeed activities={activities} limit={100} /></div>}
@@ -768,14 +783,17 @@ export default function AdminDashboard() {
             <div><label className="dm-label">Status Note</label><input className="dm-input" value={leadUpdate.note} onChange={(e) => setLeadUpdate({ ...leadUpdate, note: e.target.value })} /></div>
             <div><label className="dm-label">Admin Notes (partner sees)</label><textarea className="dm-input" value={leadUpdate.adminNotes} onChange={(e) => setLeadUpdate({ ...leadUpdate, adminNotes: e.target.value })} /></div>
 
-            <details className="rounded-xl border border-stone-200 p-4">
-              <summary className="cursor-pointer font-semibold text-stone-800">Edit Student Details</summary>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {['studentName','studentPhone','studentEmail','classGrade','city'].map((f) => (
-                  <div key={f}><label className="dm-label capitalize">{f.replace('student','')}</label><input className="dm-input" value={leadEditForm[f] || ''} onChange={(e) => setLeadEditForm({ ...leadEditForm, [f]: e.target.value })} /></div>
-                ))}
+            <details className="rounded-xl border border-stone-200 p-4" open>
+              <summary className="cursor-pointer font-semibold text-stone-800">Edit Full Lead Details</summary>
+              <div className="mt-4">
+                <LeadForm
+                  form={leadEditForm || {}}
+                  onChange={setLeadEditForm}
+                  templateFields={leadTemplateFields}
+                  onSubmit={async (e) => { e.preventDefault(); await api.admin.editLead(selectedLead.id || selectedLead._id, leadEditForm); flash('Lead details saved'); load(); }}
+                  submitLabel="Save Student Details"
+                />
               </div>
-              <button type="button" onClick={async () => { await api.admin.editLead(selectedLead.id || selectedLead._id, leadEditForm); flash('Student details saved'); }} className="dm-btn-ghost mt-3 text-sm">Save Student Details</button>
             </details>
 
             <details className="rounded-xl border border-stone-200 p-4">
@@ -807,7 +825,7 @@ export default function AdminDashboard() {
           <option value="">Select partner</option>
           {partners.filter((p) => p.status === 'active').map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <LeadForm form={adminLeadForm} onChange={setAdminLeadForm} onSubmit={async (e) => { e.preventDefault(); await api.admin.createLead(adminLeadForm); setLeadModal(false); flash('Created'); load(); }} />
+        <LeadForm form={adminLeadForm} onChange={setAdminLeadForm} templateFields={leadTemplateFields} onSubmit={async (e) => { e.preventDefault(); await api.admin.createLead(adminLeadForm); setLeadModal(false); flash('Created'); load(); }} />
       </Modal>
 
       <Modal open={commissionModal} onClose={() => setCommissionModal(false)} title="Add Manual Commission">
@@ -818,6 +836,28 @@ export default function AdminDashboard() {
           <div><label className="dm-label">Notes</label><input className="dm-input" value={commissionForm.notes} onChange={(e) => setCommissionForm({ ...commissionForm, notes: e.target.value })} /></div>
           <button type="submit" className="dm-btn-primary w-full">Create Commission</button>
         </form>
+      </Modal>
+      <Modal open={!!editCommission} onClose={() => setEditCommission(null)} title="Edit Commission">
+        {editCommission && (
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            await api.admin.updateCommission(editCommission.id, {
+              amount: Number(editCommission.amount),
+              status: editCommission.status,
+              notes: editCommission.notes,
+              paymentReference: editCommission.paymentReference,
+            });
+            flash('Commission updated');
+            setEditCommission(null);
+            load();
+          }} className="space-y-4">
+            <div><label className="dm-label">Amount ₹</label><input type="number" className="dm-input" value={editCommission.amount} onChange={(e) => setEditCommission({ ...editCommission, amount: e.target.value })} required /></div>
+            <div><label className="dm-label">Status</label><select className="dm-input" value={editCommission.status} onChange={(e) => setEditCommission({ ...editCommission, status: e.target.value })}>{['pending', 'approved', 'paid', 'cancelled'].map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
+            <div><label className="dm-label">Payment Reference</label><input className="dm-input" value={editCommission.paymentReference || ''} onChange={(e) => setEditCommission({ ...editCommission, paymentReference: e.target.value })} /></div>
+            <div><label className="dm-label">Notes</label><textarea className="dm-input" value={editCommission.notes || ''} onChange={(e) => setEditCommission({ ...editCommission, notes: e.target.value })} /></div>
+            <button type="submit" className="dm-btn-primary w-full">Save Commission</button>
+          </form>
+        )}
       </Modal>
     </DashboardLayout>
   );

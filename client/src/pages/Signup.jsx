@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useSearchParams } from 'react-router-dom';
 import { User, Mail, Phone, Lock, Building2, MapPin, Loader2, CheckCircle, Store } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Logo from '../components/Logo';
 import { PARTNER_TYPES, INDIAN_STATES, FRANCHISE_INVESTMENT_TIERS, FRANCHISE_OPERATING_MODELS } from '../utils/constants';
+import { fieldEnabled, fieldLabel, fieldRequired } from '../utils/formTemplate';
+import { api } from '../api';
 
 export default function Signup() {
   const { register } = useAuth();
@@ -30,6 +32,15 @@ export default function Signup() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [templateFields, setTemplateFields] = useState([]);
+
+  useEffect(() => {
+    api.auth.formTemplate('registration').then((r) => setTemplateFields(r.fields || [])).catch(() => {});
+  }, []);
+
+  const show = (key) => fieldEnabled(templateFields, key);
+  const lbl = (key, fb) => fieldLabel(templateFields, key, fb);
+  const req = (key, fb) => fieldRequired(templateFields, key, fb);
 
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
@@ -125,7 +136,7 @@ export default function Signup() {
               </div>
             </div>
 
-            {form.partnerType === 'franchise' && (
+            {form.partnerType === 'franchise' && show('franchiseName') && (
               <>
                 <div className="sm:col-span-2">
                   <label className="dm-label">Franchise / Centre Name *</label>

@@ -64,6 +64,11 @@ export default function PartnerDashboard() {
   const [payoutForm, setPayoutForm] = useState({});
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [phoneCheck, setPhoneCheck] = useState(null);
+  const [leadTemplateFields, setLeadTemplateFields] = useState([]);
+
+  useEffect(() => {
+    api.auth.formTemplate('lead').then((r) => setLeadTemplateFields(r.fields || [])).catch(() => {});
+  }, []);
 
   const sidebarLinks = [
     ...baseLinks,
@@ -329,6 +334,7 @@ export default function PartnerDashboard() {
           )}
           <LeadForm
             form={leadForm}
+            templateFields={leadTemplateFields}
             onChange={(f) => { setLeadForm(f); if (f.studentPhone) checkPhone(f.studentPhone); }}
             onSubmit={handleAddLead}
             loading={submitting}
