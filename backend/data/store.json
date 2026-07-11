@@ -1,0 +1,71 @@
+{
+  "users": [
+    {
+      "id": "v0Au5lQNVAPP",
+      "name": "Dream Mantra Admin",
+      "email": "admin@dreammantra.in",
+      "phone": "9680102276",
+      "password": "$2a$10$0.nd4l7JWs7S3/bhbU8wIOX7YhxuG.TpoMbr7U8fjKUBVCAjQnCEC",
+      "role": "admin",
+      "status": "active",
+      "referralCode": "ADMGFIHDS",
+      "partnerType": null,
+      "totalLeads": 0,
+      "convertedLeads": 0,
+      "totalEarnings": 0,
+      "createdAt": "2026-07-11T05:07:00.453Z",
+      "updatedAt": "2026-07-11T06:12:23.572Z",
+      "lastLoginAt": "2026-07-11T06:12:23.571Z"
+    },
+    {
+      "id": "hJoeencXUQP4",
+      "name": "Ishant",
+      "email": "123@gmail.com",
+      "phone": "",
+      "password": "$2a$10$Qx.WQC/vZL7NbrgzF.nT0uw.chUH2MMkkWkQwp9CG.BH4rkUvefvG",
+      "role": "partner",
+      "partnerType": "counsellor",
+      "organization": "Boss",
+      "city": "Jaipur",
+      "state": "Rajasthan",
+      "address": "",
+      "referralCode": "ISHGCDLJJ",
+      "status": "active",
+      "totalLeads": 0,
+      "convertedLeads": 0,
+      "totalEarnings": 0,
+      "createdAt": "2026-07-11T05:09:28.773Z",
+      "updatedAt": "2026-07-11T05:11:53.942Z",
+      "lastLoginAt": "2026-07-11T05:09:44.690Z",
+      "loginId": "CNS-SUFKQH"
+    }
+  ],
+  "leads": [],
+  "commissions": [],
+  "notifications": [
+    {
+      "id": "uhbXXv8V89jc",
+      "read": true,
+      "userId": "hJoeencXUQP4",
+      "title": "Account approved!",
+      "message": "Your partner account is now active. Start submitting leads and track their progress.",
+      "type": "partner",
+      "link": "/partner",
+      "meta": {},
+      "createdAt": "2026-07-11T05:11:53.944Z"
+    }
+  ],
+  "activities": [],
+  "announcements": [],
+  "leadComments": [],
+  "settings": {
+    "companyName": "Dream Mantra",
+    "supportEmail": "info@dreammantra.in",
+    "supportPhone": "9680102276",
+    "defaultCommissionRate": 10,
+    "whatsappNumber": "919680102276",
+    "welcomeMessage": "Welcome to Dream Mantra Partner Network!",
+    "minPayoutAmount": 500,
+    "autoApprovePartners": false
+  }
+}

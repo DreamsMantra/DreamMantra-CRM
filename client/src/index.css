@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --gold: #C9A84C;
+    --gold-light: #E8C96A;
+    --gold-dark: #B8922E;
+    --orange: #FF6B4A;
+    --orange-hover: #E8512E;
+    --warm-white: #FAFAF7;
+    --body-text: #2d2a26;
+    --text-muted: #6b6560;
+    --border: rgba(45, 42, 38, 0.1);
+    --card-bg: #FFFFFF;
+    --page-bg: #FAFAF7;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  html.light,
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    @apply font-body antialiased;
+    background: var(--page-bg);
+    color: var(--body-text);
+  }
+
+  * {
+    @apply border-stone-200;
+  }
+}
+
+@layer components {
+  .dm-card {
+    @apply rounded-2xl border border-stone-200/80 bg-white shadow-sm shadow-stone-200/50;
+  }
+
+  .dm-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-orange px-5 py-2.5 font-semibold text-white shadow-sm transition hover:bg-orange-hover focus:outline-none focus:ring-2 focus:ring-orange/40 disabled:opacity-50;
+  }
+
+  .dm-btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-gold-dark via-gold to-gold-light px-5 py-2.5 font-semibold text-stone-900 shadow-sm transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-gold/40 disabled:opacity-50;
+  }
+
+  .dm-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2 font-medium text-stone-700 shadow-sm transition hover:border-gold/40 hover:bg-stone-50;
+  }
+
+  .dm-btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 font-medium text-red-600 transition hover:bg-red-100;
+  }
+
+  .dm-input {
+    @apply w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-stone-800 placeholder:text-stone-400 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/20;
+  }
+
+  .dm-label {
+    @apply mb-1.5 block text-sm font-medium text-stone-700;
+  }
+
+  .dm-badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+
+  .dm-gradient-text {
+    @apply bg-gradient-to-r from-gold-dark via-gold to-orange bg-clip-text text-transparent;
+  }
+
+  .dm-hero-bg {
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(201, 168, 76, 0.12), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(255, 107, 74, 0.08), transparent),
+      linear-gradient(180deg, #FFFDF8 0%, #FAFAF7 50%, #F5F0E8 100%);
+  }
+
+  .dm-stat-card {
+    @apply dm-card p-5 transition hover:border-gold/40 hover:shadow-md;
+  }
+
+  .dm-sidebar-link {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-900;
+  }
+
+  .dm-sidebar-link-active {
+    @apply border border-orange/20 bg-orange/10 font-semibold text-orange;
+  }
+
+  .dm-table th {
+    @apply bg-stone-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500;
+  }
+
+  .dm-table td {
+    @apply px-4 py-3 text-sm text-stone-700;
+  }
+
+  .dm-table tr {
+    @apply border-b border-stone-100 transition hover:bg-stone-50/80;
+  }
+
+  .dm-section-title {
+    @apply font-display text-lg font-bold text-stone-900;
+  }
+
+  .dm-muted {
+    @apply text-stone-500;
+  }
+
+  .dm-page-bg {
+    @apply min-h-screen bg-[#FAFAF7];
+  }
+
+  .dm-dashboard-bg {
+    @apply bg-[#F5F3EF];
+  }
+
+  .dm-alert-success {
+    @apply flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700;
+  }
+
+  .dm-alert-error {
+    @apply flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700;
+  }
+
+  .dm-alert-warning {
+    @apply flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800;
+  }
+
+  .dm-alert-info {
+    @apply flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700;
+  }
+
+  .dm-tab {
+    @apply rounded-lg px-4 py-2 text-sm font-medium text-stone-600 transition hover:bg-stone-100;
+  }
+
+  .dm-tab-active {
+    @apply bg-white font-semibold text-orange shadow-sm ring-1 ring-stone-200;
+  }
+
+  .dm-chart-bar {
+    @apply rounded-t-md bg-gradient-to-t from-gold to-gold-light transition-all;
+  }
+
+  .dm-funnel-step {
+    @apply relative flex items-center justify-between rounded-xl border border-stone-200 bg-white px-4 py-3;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+}
