@@ -10,7 +10,7 @@ router.get('/forms/:name', (req, res) => {
   const templates = db.getFormTemplates();
   const form = templates[req.params.name];
   if (!form) return res.status(404).json({ message: 'Form not found' });
-  res.json({ fields: form.filter((f) => f.enabled !== false) });
+  res.json({ fields: form.filter((f) => f.enabled !== false), formId: req.params.name });
 });
 
 router.post('/register', async (req, res) => {

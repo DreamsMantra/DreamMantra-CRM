@@ -15,6 +15,7 @@ const defaultStore = {
   activities: [],
   announcements: [],
   leadComments: [],
+  messages: [],
   settings: {
     companyName: 'Dream Mantra',
     supportEmail: 'info@dreammantra.in',
@@ -40,7 +41,9 @@ export function loadStore() {
   if (!store.activities) store.activities = [];
   if (!store.announcements) store.announcements = [];
   if (!store.leadComments) store.leadComments = [];
+  if (!store.messages) store.messages = [];
   if (!store.settings) store.settings = defaultStore.settings;
+  if (!store.settings.customForms) store.settings.customForms = [];
   return store;
 }
 

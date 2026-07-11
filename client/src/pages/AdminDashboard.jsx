@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, IndianRupee, Plus, Search, CheckCircle, AlertCircle,
   UserPlus, TrendingUp, BarChart3, Activity, Megaphone, Settings, Calendar,
-  Database, Bell, Copy, Trash2, Send, Shield, Columns3, Sparkles, Store, SlidersHorizontal, Edit2,
+  Database, Bell, Copy, Trash2, Send, Shield, Columns3, Sparkles, Store, SlidersHorizontal, Edit2, MessageSquare,
 } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import StatCard from '../components/StatCard';
@@ -22,6 +22,7 @@ import AdminGlobalSearch from '../components/AdminGlobalSearch';
 import CredentialsModal from '../components/CredentialsModal';
 import { PartnerDetailModal, PartnerRowActions, BulkActionBar, SelectCheckbox } from '../components/admin/AdminTools';
 import MasterControl from '../components/admin/MasterControl';
+import ChatMessenger from '../components/ChatMessenger';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { PARTNER_TYPES, PARTNER_TIERS, LEAD_STATUSES, FRANCHISE_INVESTMENT_TIERS, FRANCHISE_OPERATING_MODELS, formatDate, formatCurrency, partnerTypeLabel } from '../utils/constants';
@@ -37,6 +38,7 @@ const baseLinks = [
   { to: '/admin?tab=commissions', label: 'Commissions', icon: IndianRupee },
   { to: '/admin?tab=reports', label: 'Reports', icon: BarChart3 },
   { to: '/admin?tab=notify', label: 'Send Notification', icon: Bell },
+  { to: '/admin?tab=messages', label: 'Messages', icon: MessageSquare },
   { to: '/admin?tab=data', label: 'Data & Import', icon: Database },
   { to: '/admin?tab=master', label: 'Master Control', icon: SlidersHorizontal },
   { to: '/admin?tab=activity', label: 'Activity Log', icon: Activity },
@@ -640,7 +642,11 @@ export default function AdminDashboard() {
       )}
 
       {tab === 'master' && (
-        <MasterControl token={token} onRefresh={load} flash={flash} fail={fail} />
+        <MasterControl token={token} onRefresh={load} flash={flash} fail={fail} partners={partners} leads={leads} onOpenLead={openLeadDetail} />
+      )}
+
+      {tab === 'messages' && (
+        <ChatMessenger isAdmin partners={partners} />
       )}
 
       {tab === 'activity' && <div className="dm-card p-6"><h2 className="mb-4 dm-section-title">Full Activity Log</h2><ActivityFeed activities={activities} limit={100} /></div>}

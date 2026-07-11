@@ -665,13 +665,28 @@ router.get('/export/backup', (_req, res) => {
 
 // ─── Form templates ───
 router.get('/forms', (_req, res) => {
-  res.json({ templates: db.getFormTemplates() });
+  res.json({ templates: db.getFormTemplates(), catalog: db.getFormsCatalog() });
 });
 
 router.put('/forms', (req, res) => {
-  const templates = db.updateFormTemplates(req.body.templates || req.body);
+  const result = db.updateFormTemplates(req.body.templates || req.body);
   db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'forms_updated', entityType: 'settings', details: 'Form templates saved' });
-  res.json({ templates });
+  res.json(result);
+});
+
+router.post('/forms/custom', (req, res) => {
+  const { name, description } = req.body;
+  if (!name?.trim()) return res.status(400).json({ message: 'Form name is required' });
+  const form = db.createCustomForm({ name, description });
+  db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'form_created', entityType: 'settings', details: form.name });
+  res.status(201).json({ form, templates: db.getFormTemplates(), catalog: db.getFormsCatalog() });
+});
+
+router.delete('/forms/custom/:id', (req, res) => {
+  if (!db.deleteCustomForm(req.params.id)) {
+    return res.status(400).json({ message: 'Cannot delete built-in forms' });
+  }
+  res.json({ templates: db.getFormTemplates(), catalog: db.getFormsCatalog() });
 });
 
 // ─── Registrations (partner signups) ───

@@ -18,6 +18,7 @@ import BulkLeadImport from '../components/BulkLeadImport';
 import ExportButton from '../components/ExportButton';
 import LeadComments from '../components/LeadComments';
 import FranchiseHub from '../components/FranchiseHub';
+import ChatMessenger from '../components/ChatMessenger';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { LEAD_STATUSES, formatDate, formatCurrency, partnerTypeLabel, PARTNER_TIERS } from '../utils/constants';
@@ -35,6 +36,7 @@ const baseLinks = [
   { to: '/partner?tab=profile', label: 'Profile', icon: UserCircle },
   { to: '/partner?tab=password', label: 'Security', icon: Lock },
   { to: '/partner?tab=notifications', label: 'Notifications', icon: Bell },
+  { to: '/partner?tab=messages', label: 'Messages', icon: MessageCircle },
 ];
 
 export default function PartnerDashboard() {
@@ -461,6 +463,10 @@ export default function PartnerDashboard() {
 
       {tab === 'franchise' && user?.partnerType === 'franchise' && (
         <FranchiseHub onRefresh={load} />
+      )}
+
+      {tab === 'messages' && (
+        <ChatMessenger isAdmin={false} />
       )}
 
       {tab === 'notifications' && (

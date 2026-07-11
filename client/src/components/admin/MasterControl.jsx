@@ -1,24 +1,27 @@
 import { useEffect, useState } from 'react';
 import {
-  FileText, Download, Trash2, Edit2, Save, RotateCcw, Database,
-  ClipboardList, Users, MessageSquare, Bell, Activity, RefreshCw,
+  FileText, Download, Trash2, Edit2, Save, Database,
+  ClipboardList, Users, MessageSquare, Bell, Activity, RefreshCw, Plus,
 } from 'lucide-react';
+import BulkLeadImport from '../BulkLeadImport';
 import { api } from '../../api';
 import ExportButton from '../ExportButton';
 import Modal from '../Modal';
 import { PARTNER_TYPES, INDIAN_STATES, formatDate, partnerTypeLabel } from '../../utils/constants';
 
-const FORM_NAMES = [
-  { id: 'registration', label: 'Registration Form', desc: 'Partner signup / franchise application' },
-  { id: 'lead', label: 'Lead Submission Form', desc: 'Student lead details form' },
-  { id: 'partnerProfile', label: 'Partner Profile Form', desc: 'Partner profile & payout fields' },
-];
+const FORM_NAMES = [];
 
-export default function MasterControl({ token, onRefresh, flash, fail }) {
+const FIELD_TYPES = ['text', 'email', 'tel', 'password', 'number', 'date', 'select', 'textarea', 'checkbox', 'multiselect'];
+
+export default function MasterControl({ token, onRefresh, flash, fail, partners = [], leads = [], onOpenLead }) {
   const [section, setSection] = useState('forms');
   const [templates, setTemplates] = useState({});
+  const [catalog, setCatalog] = useState([]);
   const [activeForm, setActiveForm] = useState('registration');
   const [savingForms, setSavingForms] = useState(false);
+  const [newFormName, setNewFormName] = useState('');
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [bulkPartner, setBulkPartner] = useState('');
 
   const [registrations, setRegistrations] = useState([]);
   const [regFilter, setRegFilter] = useState('all');
@@ -37,6 +40,7 @@ export default function MasterControl({ token, onRefresh, flash, fail }) {
         api.admin.allNotifications(),
       ]);
       setTemplates(forms.templates || {});
+      setCatalog(forms.catalog || []);
       setRegistrations(regs.registrations || []);
       setComments(comms.comments || []);
       setNotifications(notifs.notifications || []);
@@ -52,6 +56,7 @@ export default function MasterControl({ token, onRefresh, flash, fail }) {
     try {
       const res = await api.admin.updateForms(templates);
       setTemplates(res.templates);
+      setCatalog(res.catalog || catalog);
       flash('Form templates saved — live on registration & lead forms');
     } catch (err) {
       fail(err);
@@ -66,8 +71,45 @@ export default function MasterControl({ token, onRefresh, flash, fail }) {
     setTemplates({ ...templates, [formId]: fields });
   };
 
+  const deleteField = (formId, idx) => {
+    const fields = [...(templates[formId] || [])];
+    fields.splice(idx, 1);
+    setTemplates({ ...templates, [formId]: fields });
+  };
+
+  const addField = () => {
+    const key = `field_${Date.now().toString(36).slice(-6)}`;
+    const fields = [...(templates[activeForm] || []), { key, label: 'New Field', type: 'text', required: false, enabled: true }];
+    setTemplates({ ...templates, [activeForm]: fields });
+  };
+
+  const createForm = async () => {
+    if (!newFormName.trim()) return;
+    try {
+      const res = await api.admin.createCustomForm({ name: newFormName, description: '' });
+      setTemplates(res.templates);
+      setCatalog(res.catalog);
+      setActiveForm(res.form.id);
+      setNewFormName('');
+      setShowNewForm(false);
+      flash(`Form "${res.form.name}" created`);
+    } catch (err) { fail(err); }
+  };
+
+  const removeForm = async (formId) => {
+    const item = catalog.find((c) => c.id === formId);
+    if (item?.builtin) { fail(new Error('Built-in forms cannot be deleted')); return; }
+    if (!confirm(`Delete form "${item?.label}"?`)) return;
+    const res = await api.admin.deleteCustomForm(formId);
+    setTemplates(res.templates);
+    setCatalog(res.catalog);
+    setActiveForm('registration');
+    flash('Form deleted');
+  };
+
   const sections = [
     { id: 'forms', label: 'Form Builder', icon: FileText },
+    { id: 'leads', label: 'Bulk Leads', icon: ClipboardList },
     { id: 'registrations', label: 'Registrations', icon: Users },
     { id: 'comments', label: 'Comments', icon: MessageSquare },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -93,40 +135,106 @@ export default function MasterControl({ token, onRefresh, flash, fail }) {
       {section === 'forms' && (
         <div className="grid gap-6 lg:grid-cols-4">
           <div className="space-y-2 lg:col-span-1">
-            {FORM_NAMES.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setActiveForm(f.id)}
-                className={`w-full rounded-xl border p-4 text-left transition ${activeForm === f.id ? 'border-orange bg-orange/5' : 'border-stone-200 hover:border-gold/40'}`}
-              >
-                <p className="font-semibold text-stone-900">{f.label}</p>
-                <p className="mt-1 text-xs text-stone-500">{f.desc}</p>
-              </button>
+            {catalog.map((f) => (
+              <div key={f.id} className={`rounded-xl border transition ${activeForm === f.id ? 'border-orange bg-orange/5' : 'border-stone-200'}`}>
+                <button type="button" onClick={() => setActiveForm(f.id)} className="w-full p-4 text-left">
+                  <p className="font-semibold text-stone-900">{f.label || f.name}</p>
+                  <p className="mt-1 text-xs text-stone-500">{f.description}</p>
+                  {f.builtin && <span className="mt-1 inline-block text-[10px] font-bold uppercase text-gold-dark">Built-in</span>}
+                </button>
+                {!f.builtin && activeForm === f.id && (
+                  <button type="button" onClick={() => removeForm(f.id)} className="w-full border-t border-red-100 py-2 text-xs text-red-600 hover:bg-red-50">Delete Form</button>
+                )}
+              </div>
             ))}
+            {showNewForm ? (
+              <div className="rounded-xl border border-gold/30 bg-gold/5 p-3 space-y-2">
+                <input className="dm-input text-sm" placeholder="Form name" value={newFormName} onChange={(e) => setNewFormName(e.target.value)} />
+                <div className="flex gap-2">
+                  <button type="button" onClick={createForm} className="dm-btn-primary flex-1 text-xs py-2">Create</button>
+                  <button type="button" onClick={() => setShowNewForm(false)} className="dm-btn-ghost text-xs py-2">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setShowNewForm(true)} className="dm-btn-gold w-full text-sm"><Plus className="h-4 w-4" /> New Form</button>
+            )}
           </div>
           <div className="lg:col-span-3 dm-card p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-display text-lg font-bold text-stone-900">Edit Fields — {FORM_NAMES.find((f) => f.id === activeForm)?.label}</h3>
-              <button type="button" onClick={saveForms} disabled={savingForms} className="dm-btn-primary text-sm"><Save className="h-4 w-4" /> Save Forms</button>
+              <h3 className="font-display text-lg font-bold text-stone-900">
+                Edit Fields — {catalog.find((f) => f.id === activeForm)?.label || activeForm}
+              </h3>
+              <div className="flex gap-2">
+                <button type="button" onClick={addField} className="dm-btn-ghost text-sm"><Plus className="h-4 w-4" /> Add Field</button>
+                <button type="button" onClick={saveForms} disabled={savingForms} className="dm-btn-primary text-sm"><Save className="h-4 w-4" /> Save Forms</button>
+              </div>
             </div>
-            <p className="mb-4 text-sm text-stone-500">Toggle fields on/off, rename labels, mark required. Changes apply to live forms after save.</p>
+            <p className="mb-4 text-sm text-stone-500">Add, edit, delete fields. Toggle on/off, rename labels, change type. Click Save to apply live.</p>
             <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+              {(templates[activeForm] || []).length === 0 && (
+                <p className="py-8 text-center text-stone-400">No fields yet — click Add Field</p>
+              )}
               {(templates[activeForm] || []).map((field, idx) => (
-                <div key={field.key} className="flex flex-wrap items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-                  <label className="flex items-center gap-2">
+                <div key={`${field.key}-${idx}`} className="flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3">
+                  <label className="flex items-center gap-2" title="Enabled">
                     <input type="checkbox" checked={field.enabled !== false} onChange={(e) => updateField(activeForm, idx, { enabled: e.target.checked })} />
-                    <span className="font-mono text-xs text-stone-400">{field.key}</span>
                   </label>
-                  <input className="dm-input min-w-[140px] flex-1 py-1.5 text-sm" value={field.label} onChange={(e) => updateField(activeForm, idx, { label: e.target.value })} />
-                  <label className="flex items-center gap-1 text-xs text-stone-600">
+                  <input className="dm-input w-28 py-1.5 font-mono text-xs" value={field.key} onChange={(e) => updateField(activeForm, idx, { key: e.target.value.replace(/\s/g, '_') })} placeholder="key" />
+                  <input className="dm-input min-w-[120px] flex-1 py-1.5 text-sm" value={field.label} onChange={(e) => updateField(activeForm, idx, { label: e.target.value })} placeholder="Label" />
+                  <select className="dm-input w-auto py-1.5 text-xs" value={field.type || 'text'} onChange={(e) => updateField(activeForm, idx, { type: e.target.value })}>
+                    {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <label className="flex items-center gap-1 text-xs whitespace-nowrap">
                     <input type="checkbox" checked={!!field.required} onChange={(e) => updateField(activeForm, idx, { required: e.target.checked })} />
-                    Required
+                    Req.
                   </label>
-                  <span className="text-xs capitalize text-stone-400">{field.type}</span>
+                  <button type="button" onClick={() => deleteField(activeForm, idx)} className="rounded-lg p-1.5 text-red-500 hover:bg-red-50" title="Delete field"><Trash2 className="h-4 w-4" /></button>
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {section === 'leads' && (
+        <div className="space-y-6">
+          <div className="dm-card p-6">
+            <h3 className="mb-4 font-display text-lg font-bold text-stone-900">Bulk Import Leads</h3>
+            <select className="dm-input mb-4 max-w-md" value={bulkPartner} onChange={(e) => setBulkPartner(e.target.value)}>
+              <option value="">Select partner for bulk import</option>
+              {partners.filter((p) => p.status === 'active').map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <BulkLeadImport onImport={async (leadsData) => {
+              if (!bulkPartner) { fail(new Error('Select a partner first')); return; }
+              const res = await api.admin.bulkLeads(bulkPartner, leadsData);
+              flash(`Imported ${res.created} leads`);
+              onRefresh?.();
+            }} />
+          </div>
+          <div className="dm-card overflow-x-auto p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-display text-lg font-bold text-stone-900">Manage Existing Leads ({leads.length})</h3>
+              <ExportButton href={api.admin.exportLeads()} token={token} label="Download All" />
+            </div>
+            <table className="dm-table w-full">
+              <thead><tr><th>Lead ID</th><th>Student</th><th>Phone</th><th>Partner</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                {leads.slice(0, 50).map((l) => (
+                  <tr key={l.id || l._id}>
+                    <td className="font-mono text-gold-dark">{l.leadId}</td>
+                    <td>{l.studentName}</td>
+                    <td>{l.studentPhone}</td>
+                    <td>{l.partnerName || l.partner?.name}</td>
+                    <td className="capitalize">{l.status}</td>
+                    <td className="space-x-2">
+                      <button type="button" onClick={() => onOpenLead?.(l)} className="text-gold-dark text-xs font-semibold">Edit</button>
+                      <button type="button" onClick={async () => { if (confirm('Delete lead?')) { await api.admin.deleteLead(l.id || l._id); flash('Deleted'); onRefresh?.(); } }} className="text-red-600 text-xs">Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {leads.length > 50 && <p className="mt-2 text-center text-xs text-stone-400">Showing 50 of {leads.length} — use All Leads tab for full list</p>}
           </div>
         </div>
       )}

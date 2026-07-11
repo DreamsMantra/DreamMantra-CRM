@@ -8,6 +8,8 @@ import { initDatabase, getDbStatus } from './db.js';
 import authRoutes from './routes/auth.js';
 import partnerRoutes from './routes/partner.js';
 import adminRoutes from './routes/admin.js';
+import messagesRoutes from './routes/messages.js';
+import { UPLOAD_DIR } from './lib/upload.js';
 
 dotenv.config();
 
@@ -32,6 +34,8 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/partner', partnerRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/messages', messagesRoutes);
+app.use('/api/uploads', express.static(UPLOAD_DIR));
 
 if (hasBuiltClient) {
   app.use(express.static(clientDist, { maxAge: '1d' }));

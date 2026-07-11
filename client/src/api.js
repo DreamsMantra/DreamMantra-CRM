@@ -120,5 +120,28 @@ export const api = {
     allNotifications: () => request('/admin/notifications'),
     deleteNotification: (id) => request(`/admin/notifications/${id}`, { method: 'DELETE' }),
     clearActivities: () => request('/admin/activities', { method: 'DELETE' }),
+    createCustomForm: (body) => request('/admin/forms/custom', { method: 'POST', body: JSON.stringify(body) }),
+    deleteCustomForm: (id) => request(`/admin/forms/custom/${id}`, { method: 'DELETE' }),
+  },
+
+  messages: {
+    inbox: () => request('/messages/inbox'),
+    thread: (otherUserId) => request(otherUserId ? `/messages/thread/${otherUserId}` : '/messages/thread'),
+    send: async ({ recipientId, message, file }) => {
+      const token = localStorage.getItem('crm_token');
+      const fd = new FormData();
+      if (recipientId) fd.append('recipientId', recipientId);
+      if (message) fd.append('message', message);
+      if (file) fd.append('file', file);
+      const res = await fetch(`${API_BASE}/messages/send`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Send failed');
+      return data;
+    },
+    markRead: (otherUserId) => request(`/messages/read/${otherUserId}`, { method: 'PATCH' }),
   },
 };

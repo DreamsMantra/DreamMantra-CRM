@@ -333,18 +333,49 @@ export function getFormTemplates() {
   const saved = settings.formTemplates || {};
   const merged = {};
   for (const [form, defaults] of Object.entries(DEFAULT_FORM_TEMPLATES)) {
-    const savedFields = saved[form] || [];
-    const savedMap = Object.fromEntries(savedFields.map((f) => [f.key, f]));
-    merged[form] = defaults.map((d) => ({ ...d, ...savedMap[d.key] }));
+    merged[form] = saved[form]?.length ? saved[form] : defaults.map((d) => ({ ...d }));
+  }
+  for (const custom of settings.customForms || []) {
+    merged[custom.id] = saved[custom.id] || [];
   }
   return merged;
+}
+
+export function getFormsCatalog() {
+  const builtins = [
+    { id: 'registration', label: 'Registration Form', description: 'Partner signup / franchise application', builtin: true },
+    { id: 'lead', label: 'Lead Submission Form', description: 'Student lead details form', builtin: true },
+    { id: 'partnerProfile', label: 'Partner Profile Form', description: 'Partner profile & payout fields', builtin: true },
+  ];
+  const custom = (getSettings().customForms || []).map((c) => ({ ...c, label: c.name, builtin: false }));
+  return [...builtins, ...custom];
+}
+
+export function createCustomForm({ name, description }) {
+  const store = loadStore();
+  if (!store.settings.customForms) store.settings.customForms = [];
+  const id = `custom_${newId().slice(0, 8)}`;
+  store.settings.customForms.push({ id, name: name.trim(), description: description?.trim() || '', createdAt: now() });
+  if (!store.settings.formTemplates) store.settings.formTemplates = {};
+  store.settings.formTemplates[id] = [];
+  saveStore(store);
+  return { id, name, description };
+}
+
+export function deleteCustomForm(formId) {
+  if (['registration', 'lead', 'partnerProfile'].includes(formId)) return false;
+  const store = loadStore();
+  store.settings.customForms = (store.settings.customForms || []).filter((c) => c.id !== formId);
+  if (store.settings.formTemplates) delete store.settings.formTemplates[formId];
+  saveStore(store);
+  return true;
 }
 
 export function updateFormTemplates(templates) {
   const store = loadStore();
   store.settings = { ...store.settings, formTemplates: templates };
   saveStore(store);
-  return getFormTemplates();
+  return { templates: getFormTemplates(), catalog: getFormsCatalog() };
 }
 
 export function getRegistrations(filter = {}) {
@@ -424,6 +455,88 @@ export function exportAnnouncementsCSV() {
   const headers = ['Title', 'Message', 'Active', 'Created'];
   const rows = items.map((a) => [a.title, a.message, a.active !== false, a.createdAt?.slice(0, 10) || '']);
   return [headers, ...rows].map((r) => r.map(csvEscape).join(',')).join('\n');
+}
+
+// ─── Direct Messages (Admin ↔ Partner) ───
+export function conversationId(a, b) {
+  return [a, b].sort().join('__');
+}
+
+export function getAdminUser() {
+  return findUser({ role: 'admin' });
+}
+
+export function createDirectMessage({
+  senderId, senderName, senderRole, recipientId, text = '', attachment = null,
+}) {
+  const store = loadStore();
+  const convId = conversationId(senderId, recipientId);
+  const msg = {
+    id: newId(),
+    conversationId: convId,
+    senderId,
+    senderName,
+    senderRole,
+    recipientId,
+    text: text?.trim() || '',
+    type: attachment ? attachment.type : 'text',
+    fileUrl: attachment?.url || '',
+    fileName: attachment?.name || '',
+    fileMime: attachment?.mime || '',
+    fileSize: attachment?.size || 0,
+    read: false,
+    createdAt: now(),
+  };
+  if (!store.messages) store.messages = [];
+  store.messages.push(msg);
+  saveStore(store);
+  return msg;
+}
+
+export function getThread(userId, otherUserId, limit = 200) {
+  const convId = conversationId(userId, otherUserId);
+  return sortByDate(
+    loadStore().messages.filter((m) => m.conversationId === convId),
+    'createdAt',
+    false
+  ).slice(-limit);
+}
+
+export function getInboxForUser(userId, role) {
+  const messages = loadStore().messages || [];
+  const relevant = messages.filter((m) => m.senderId === userId || m.recipientId === userId);
+  const convMap = {};
+
+  relevant.forEach((m) => {
+    const otherId = m.senderId === userId ? m.recipientId : m.senderId;
+    if (!convMap[otherId] || new Date(m.createdAt) > new Date(convMap[otherId].lastAt)) {
+      const other = findUser({ id: otherId });
+      const unread = messages.filter(
+        (x) => x.conversationId === m.conversationId && x.recipientId === userId && !x.read
+      ).length;
+      convMap[otherId] = {
+        otherUserId: otherId,
+        otherUserName: other?.name || 'User',
+        otherUserRole: other?.role,
+        otherUserAvatar: other?.name?.charAt(0) || '?',
+        lastMessage: m.text || (m.fileName ? `📎 ${m.fileName}` : 'Attachment'),
+        lastAt: m.createdAt,
+        unread,
+        conversationId: m.conversationId,
+      };
+    }
+  });
+
+  return sortByDate(Object.values(convMap), 'lastAt');
+}
+
+export function markThreadRead(userId, otherUserId) {
+  const store = loadStore();
+  const convId = conversationId(userId, otherUserId);
+  store.messages.forEach((m) => {
+    if (m.conversationId === convId && m.recipientId === userId) m.read = true;
+  });
+  saveStore(store);
 }
 
 export function exportFullBackup() {
