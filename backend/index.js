@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { initDatabase, getDbStatus } from './db.js';
+import { initDatabase, getDbStatus, getStorageInfo, shutdownDatabase } from './db.js';
 import authRoutes from './routes/auth.js';
 import partnerRoutes from './routes/partner.js';
 import adminRoutes from './routes/admin.js';
@@ -28,7 +28,14 @@ app.use(cors({ origin: corsOrigins, credentials: true }));
 app.use(express.json({ limit: '5mb' }));
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, db: getDbStatus(), storage: 'json-file', ts: Date.now() });
+  const storage = getStorageInfo();
+  res.json({
+    ok: true,
+    db: getDbStatus(),
+    storage: storage.mode,
+    mongo: storage.mongo,
+    ts: Date.now(),
+  });
 });
 
 app.use('/api/auth', authRoutes);
@@ -47,10 +54,21 @@ if (hasBuiltClient) {
 
 async function start() {
   await initDatabase();
-  console.log('✓ JSON file database ready');
+  const { mode, mongo } = getStorageInfo();
+  console.log(`✓ Database ready (${mode}${mongo !== 'not_configured' ? ` · ${mongo}` : ''})`);
   app.listen(PORT, () => {
     console.log(`Cream Mantra CRM API running on http://localhost:${PORT}`);
   });
 }
+
+process.on('SIGINT', async () => {
+  await shutdownDatabase();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  await shutdownDatabase();
+  process.exit(0);
+});
 
 start();

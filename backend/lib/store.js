@@ -2,12 +2,14 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { nanoid } from 'nanoid';
+import CrmStore from '../models/CrmStore.js';
+import { connectMongo, isMongoConfigured } from './mongo.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '../data');
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
 
-const defaultStore = {
+export const defaultStore = {
   users: [],
   leads: [],
   commissions: [],
@@ -25,31 +27,107 @@ const defaultStore = {
     welcomeMessage: 'Welcome to Dream Mantra Partner Network!',
     minPayoutAmount: 500,
     autoApprovePartners: false,
+    customForms: [],
   },
 };
 
-function ensureStore() {
+let memoryStore = null;
+let storageMode = 'json-file';
+let mongoSaveChain = Promise.resolve();
+
+function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+function normalizeStore(store) {
+  const normalized = { ...defaultStore, ...store };
+  if (!normalized.activities) normalized.activities = [];
+  if (!normalized.announcements) normalized.announcements = [];
+  if (!normalized.leadComments) normalized.leadComments = [];
+  if (!normalized.messages) normalized.messages = [];
+  if (!normalized.settings) normalized.settings = { ...defaultStore.settings };
+  if (!normalized.settings.customForms) normalized.settings.customForms = [];
+  return normalized;
+}
+
+function loadFromFile() {
+  ensureDataDir();
   if (!fs.existsSync(STORE_FILE)) {
     fs.writeFileSync(STORE_FILE, JSON.stringify(defaultStore, null, 2));
+  }
+  return normalizeStore(JSON.parse(fs.readFileSync(STORE_FILE, 'utf8')));
+}
+
+function saveToFile(store) {
+  ensureDataDir();
+  fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2));
+}
+
+async function persistToMongo(store) {
+  await CrmStore.findOneAndUpdate(
+    { _id: 'main' },
+    { data: store, updatedAt: new Date() },
+    { upsert: true, new: true }
+  );
+}
+
+function queueMongoSave(store) {
+  mongoSaveChain = mongoSaveChain
+    .then(() => persistToMongo(store))
+    .catch((err) => {
+      console.error('MongoDB save failed:', err.message);
+    });
+  return mongoSaveChain;
+}
+
+export function getStorageMode() {
+  return storageMode;
+}
+
+export async function flushStore() {
+  if (storageMode === 'mongodb' && memoryStore) {
+    await persistToMongo(memoryStore);
+  }
+}
+
+export async function initStore() {
+  if (isMongoConfigured()) {
+    await connectMongo();
+    const doc = await CrmStore.findById('main').lean();
+    if (doc?.data) {
+      memoryStore = normalizeStore(doc.data);
+      console.log('✓ CRM data loaded from MongoDB Atlas');
+    } else if (fs.existsSync(STORE_FILE)) {
+      memoryStore = loadFromFile();
+      await persistToMongo(memoryStore);
+      console.log('✓ Migrated local store.json → MongoDB Atlas');
+    } else {
+      memoryStore = normalizeStore(defaultStore);
+      await persistToMongo(memoryStore);
+      console.log('✓ Initialized new CRM database on MongoDB Atlas');
+    }
+    storageMode = 'mongodb';
+  } else {
+    memoryStore = loadFromFile();
+    storageMode = 'json-file';
+    console.log('✓ Using local JSON file database (set MONGODB_URI for Atlas)');
   }
 }
 
 export function loadStore() {
-  ensureStore();
-  const store = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
-  if (!store.activities) store.activities = [];
-  if (!store.announcements) store.announcements = [];
-  if (!store.leadComments) store.leadComments = [];
-  if (!store.messages) store.messages = [];
-  if (!store.settings) store.settings = defaultStore.settings;
-  if (!store.settings.customForms) store.settings.customForms = [];
-  return store;
+  if (!memoryStore) {
+    throw new Error('Database not initialized — call initStore() first');
+  }
+  return memoryStore;
 }
 
 export function saveStore(store) {
-  ensureStore();
-  fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2));
+  memoryStore = normalizeStore(store);
+  if (storageMode === 'mongodb') {
+    queueMongoSave(memoryStore);
+  } else {
+    saveToFile(memoryStore);
+  }
 }
 
 export function newId() {

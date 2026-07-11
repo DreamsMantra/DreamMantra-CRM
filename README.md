@@ -38,7 +38,7 @@ Referral Partner · Teacher · School · College · Coaching Center · Influence
 | Layer    | Technology                          |
 |----------|-------------------------------------|
 | Frontend | React 18, Vite, Tailwind CSS, Framer Motion |
-| Backend  | Node.js, Express, JSON file DB, JWT |
+| Backend  | Node.js, Express, MongoDB Atlas (or JSON file fallback), JWT |
 
 ---
 
@@ -46,7 +46,8 @@ Referral Partner · Teacher · School · College · Coaching Center · Influence
 
 ### Prerequisites
 - **Node.js 18+**
-- No database install required (uses JSON file storage in `backend/data/store.json`)
+- **MongoDB Atlas** (recommended) — see [MONGODB_ATLAS_SETUP.md](./MONGODB_ATLAS_SETUP.md)
+- Or use local JSON file storage (`backend/data/store.json`) if `MONGODB_URI` is not set
 
 ### Run everything (recommended)
 
@@ -69,7 +70,7 @@ Default admin (auto-created on first run):
 ```bash
 # Terminal 1 — backend
 cd backend
-cp .env.example .env   # first time only
+cp .env.example .env   # first time only — add MONGODB_URI for Atlas
 npm install
 npm run dev
 
