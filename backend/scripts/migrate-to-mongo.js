@@ -26,7 +26,7 @@ async function main() {
   console.log(`Messages: ${store.messages?.length || 0}`);
 
   await flushStore();
-  console.log('✓ Migration complete — data saved to MongoDB Atlas');
+  console.log('✓ Migration complete — data saved to MongoDB');
   process.exit(0);
 }
 

@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getDashboardPath } from '../config/roleNavigation';
 import Logo from './Logo';
 
 export default function PublicNavbar() {
@@ -19,13 +20,13 @@ export default function PublicNavbar() {
         </nav>
         <div className="flex items-center gap-3">
           {user ? (
-            <button type="button" className="dm-btn-primary text-sm" onClick={() => navigate(user.role === 'admin' ? '/admin' : '/partner')}>
+            <button type="button" className="dm-btn-primary text-sm" onClick={() => navigate(getDashboardPath(user.role))}>
               Go to Dashboard
             </button>
           ) : (
             <>
               <Link to="/login" className="dm-btn-ghost text-sm">Sign In</Link>
-              <Link to="/signup?type=franchise" className="dm-btn-ghost text-sm hidden sm:inline-flex">Franchise</Link>
+              <Link to="/signup?type=agency" className="dm-btn-ghost text-sm hidden sm:inline-flex">Agency</Link>
               <Link to="/signup" className="dm-btn-primary text-sm">Become a Partner</Link>
             </>
           )}

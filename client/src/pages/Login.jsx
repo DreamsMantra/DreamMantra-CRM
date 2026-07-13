@@ -5,6 +5,7 @@ import { User, Lock, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Logo from '../components/Logo';
 import CompanyInfoSection from '../components/CompanyInfoSection';
+import { getDashboardPath } from '../config/roleNavigation';
 import { COMPANY } from '../utils/companyInfo';
 
 export default function Login() {
@@ -16,7 +17,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   if (!authLoading && user) {
-    navigate(user.role === 'admin' ? '/admin' : '/partner', { replace: true });
+    navigate(getDashboardPath(user.role), { replace: true });
   }
 
   const handleSubmit = async (e) => {
@@ -25,7 +26,7 @@ export default function Login() {
     setLoading(true);
     try {
       const data = await login(identifier.trim(), password);
-      navigate(data.user.role === 'admin' ? '/admin' : '/partner', { replace: true });
+      navigate(getDashboardPath(data.user.role), { replace: true });
     } catch (err) {
       setError(err.message || 'Login failed');
     } finally {

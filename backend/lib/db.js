@@ -1,11 +1,13 @@
 import bcrypt from 'bcryptjs';
 import { loadStore, saveStore, newId, now, findById, sortByDate } from '../lib/store.js';
 import { DEFAULT_FORM_TEMPLATES } from '../data/formDefaults.js';
+import { STAFF_ROLES, getDefaultPermissions, isStaffRole, normalizeLeadStatus } from './roles.js';
+import { normalizeAgencyUser, isAgencyPartner, agencyTierTarget, AGENCY_ONBOARDING_KEYS } from './agency.js';
 
 export const PARTNER_TIERS = ['bronze', 'silver', 'gold', 'platinum'];
 
 export const PARTNER_TYPES = [
-  'referral_partner', 'teacher', 'school', 'college', 'coaching_center', 'influencer', 'counsellor', 'franchise',
+  'referral_partner', 'teacher', 'school', 'college', 'coaching_center', 'influencer', 'counsellor', 'agency',
 ];
 
 export function userToSafeJSON(user) {
@@ -26,7 +28,9 @@ export function findUser(query) {
   }
   if (query.id) return findById(users, query.id);
   if (query.referralCode) return users.find((u) => u.referralCode === query.referralCode) || null;
-  if (query.role === 'admin') return users.find((u) => u.role === 'admin') || null;
+  if (query.role === 'admin') return users.find((u) => u.role === 'admin' || u.role === 'super_admin') || null;
+  if (query.role === 'super_admin') return users.find((u) => u.role === 'super_admin') || null;
+  if (query.role) return users.find((u) => u.role === query.role) || null;
   return null;
 }
 
@@ -103,15 +107,15 @@ export function createUser(data) {
     upiId: data.upiId || '',
     panNumber: data.panNumber || '',
     documentsVerified: false,
-    franchiseName: data.franchiseName || '',
+    agencyName: data.agencyName || data.franchiseName || '',
     territory: data.territory || '',
     outletCount: data.outletCount || 1,
     investmentTier: data.investmentTier || 'starter',
-    franchiseCode: data.franchiseCode || '',
+    agencyCode: data.agencyCode || data.franchiseCode || '',
     royaltyPercent: data.royaltyPercent ?? 8,
     operatingModel: data.operatingModel || 'single_outlet',
     agreementDate: data.agreementDate || '',
-    franchiseOnboarding: data.franchiseOnboarding || {
+    agencyOnboarding: data.agencyOnboarding || data.franchiseOnboarding || {
       agreementSigned: false,
       trainingCompleted: false,
       brandingSetup: false,
@@ -137,22 +141,30 @@ export function updateUser(id, updates) {
 }
 
 export async function seedAdmin() {
-  const existing = findUser({ role: 'admin' });
+  const users = getUsers();
+  const legacyAdmin = users.find((u) => u.role === 'admin');
+  if (legacyAdmin && legacyAdmin.role === 'admin') {
+    updateUser(legacyAdmin.id, { role: 'super_admin', permissions: getDefaultPermissions('super_admin') });
+    console.log(`✓ Upgraded admin to super_admin: ${legacyAdmin.email}`);
+    return findUser({ id: legacyAdmin.id });
+  }
+  const existing = findUser({ role: 'super_admin' });
   if (existing) return existing;
   const email = (process.env.ADMIN_EMAIL || 'admin@dreammantra.in').toLowerCase();
   const password = process.env.ADMIN_PASSWORD || 'Admin@123';
   const hash = await bcrypt.hash(password, 10);
   const admin = createUser({
-    name: process.env.ADMIN_NAME || 'Dream Mantra Admin',
+    name: process.env.ADMIN_NAME || 'Dream Mantra Super Admin',
     email,
     phone: '9680102276',
     password: hash,
-    role: 'admin',
+    role: 'super_admin',
     status: 'active',
+    permissions: getDefaultPermissions('super_admin'),
     referralCode: generateReferralCode('ADM'),
     partnerType: null,
   });
-  console.log(`✓ Admin seeded: ${email}`);
+  console.log(`✓ Super Admin seeded: ${email}`);
   return admin;
 }
 
@@ -162,12 +174,18 @@ export function getLeads(filter = {}) {
   if (filter.status && filter.status !== 'all') leads = leads.filter((l) => l.status === filter.status);
   if (filter.priority && filter.priority !== 'all') leads = leads.filter((l) => l.priority === filter.priority);
   if (filter.city && filter.city !== 'all') leads = leads.filter((l) => (l.city || '').toLowerCase().includes(filter.city.toLowerCase()));
+  if (filter.leadType && filter.leadType !== 'all') {
+    leads = leads.filter((l) => (l.leadType || 'student') === filter.leadType);
+  }
   if (filter.search) {
     const q = filter.search.toLowerCase();
     leads = leads.filter(
       (l) =>
         (l.studentName || '').toLowerCase().includes(q) ||
         (l.studentPhone || '').includes(q) ||
+        (l.companyName || '').toLowerCase().includes(q) ||
+        (l.contactPerson || '').toLowerCase().includes(q) ||
+        (l.contactPhone || '').includes(q) ||
         (l.leadId || '').toLowerCase().includes(q) ||
         (l.partnerName || '').toLowerCase().includes(q)
     );
@@ -463,7 +481,7 @@ export function conversationId(a, b) {
 }
 
 export function getAdminUser() {
-  return findUser({ role: 'admin' });
+  return findUser({ role: 'super_admin' }) || findUser({ role: 'admin' });
 }
 
 export function createDirectMessage({
@@ -682,6 +700,15 @@ export function deleteLead(id) {
   return lead;
 }
 
+export function deleteUser(id) {
+  const store = loadStore();
+  const user = store.users.find((u) => u.id === id);
+  if (!user) return null;
+  store.users = store.users.filter((u) => u.id !== id);
+  saveStore(store);
+  return user;
+}
+
 export function deletePartner(id) {
   const store = loadStore();
   const partner = store.users.find((u) => u.id === id && u.role === 'partner');
@@ -794,7 +821,8 @@ export function getSystemStats() {
   return {
     users: store.users.length,
     partners: store.users.filter((u) => u.role === 'partner').length,
-    franchises: store.users.filter((u) => u.role === 'partner' && u.partnerType === 'franchise').length,
+    franchises: store.users.filter((u) => u.role === 'partner' && (u.partnerType === 'agency' || u.partnerType === 'franchise')).length,
+    agencies: store.users.filter((u) => u.role === 'partner' && (u.partnerType === 'agency' || u.partnerType === 'franchise')).length,
     leads: store.leads.length,
     commissions: store.commissions.length,
     notifications: store.notifications.length,
@@ -803,61 +831,68 @@ export function getSystemStats() {
   };
 }
 
-export function getFranchises() {
-  return queryUsers({ partnerType: 'franchise' }).map((f) => {
+export function getAgencies() {
+  return queryUsers({ partnerType: 'agency' })
+    .concat(queryUsers({ partnerType: 'franchise' }))
+    .map((f) => {
+    const norm = normalizeAgencyUser(f);
     const leads = getLeads({ partnerId: f.id });
     const commissions = getCommissions({ partnerId: f.id });
-    const converted = leads.filter((l) => l.status === 'converted').length;
+    const converted = leads.filter((l) => ['completed', 'converted'].includes(normalizeLeadStatus(l.status))).length;
     const paid = commissions.filter((c) => c.status === 'paid').reduce((s, c) => s + c.amount, 0);
-    const onboarding = f.franchiseOnboarding || {};
-    const stepsDone = Object.values(onboarding).filter(Boolean).length;
+    const onboarding = norm.agencyOnboarding || {};
+    const stepsDone = AGENCY_ONBOARDING_KEYS.filter((k) => onboarding[k]).length;
     return {
-      ...userToSafeJSON(f),
+      ...userToSafeJSON(norm),
       stats: {
         totalLeads: leads.length,
         converted,
         conversionRate: leads.length ? Math.round((converted / leads.length) * 100) : 0,
         totalEarnings: paid,
-        onboardingProgress: Math.round((stepsDone / 6) * 100),
+        onboardingProgress: Math.round((stepsDone / AGENCY_ONBOARDING_KEYS.length) * 100),
       },
     };
   });
 }
 
-export function getFranchiseHubData(partnerId) {
-  const partner = findUser({ id: partnerId });
-  if (!partner || partner.partnerType !== 'franchise') return null;
+/** @deprecated use getAgencies */
+export const getFranchises = getAgencies;
+
+export function getAgencyHubData(partnerId) {
+  const partner = normalizeAgencyUser(findUser({ id: partnerId }));
+  if (!partner || !isAgencyPartner(partner)) return null;
 
   const leads = getLeads({ partnerId });
   const commissions = getCommissions({ partnerId });
-  const converted = leads.filter((l) => l.status === 'converted').length;
+  const converted = leads.filter((l) => ['completed', 'converted'].includes(normalizeLeadStatus(l.status))).length;
   const paid = commissions.filter((c) => c.status === 'paid').reduce((s, c) => s + c.amount, 0);
   const pending = commissions.filter((c) => c.status === 'pending' || c.status === 'approved').reduce((s, c) => s + c.amount, 0);
 
-  const tierTargets = { starter: 30, growth: 60, flagship: 100 };
-  const monthlyTarget = tierTargets[partner.investmentTier] || 30;
+  const monthlyTarget = agencyTierTarget(partner.investmentTier);
   const nowDate = new Date();
   const monthLeads = leads.filter((l) => {
     const d = new Date(l.createdAt);
     return d.getMonth() === nowDate.getMonth() && d.getFullYear() === nowDate.getFullYear();
   }).length;
 
-  let onboarding = { ...(partner.franchiseOnboarding || {}) };
+  let onboarding = { ...(partner.agencyOnboarding || {}) };
   if (leads.length > 0) onboarding.firstLeadSubmitted = true;
   if (partner.bankAccount || partner.upiId) onboarding.payoutDetailsAdded = true;
-  const stepsDone = Object.values(onboarding).filter(Boolean).length;
+  const stepsDone = AGENCY_ONBOARDING_KEYS.filter((k) => onboarding[k]).length;
 
   const monthlyTrend = getMonthlyTrends(6).map((m) => ({
     ...m,
-    franchiseLeads: leads.filter((l) => {
+    agencyLeads: leads.filter((l) => {
       const d = new Date(l.createdAt);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       return key === m.month;
     }).length,
   }));
 
+  const team = getTeamMembers({ agencyId: partnerId });
+
   return {
-    partner: userToSafeJSON({ ...partner, franchiseOnboarding: onboarding }),
+    partner: userToSafeJSON({ ...partner, agencyOnboarding: onboarding }),
     territory: partner.territory || partner.city || '—',
     stats: {
       totalLeads: leads.length,
@@ -870,22 +905,444 @@ export function getFranchiseHubData(partnerId) {
       pendingCommission: pending,
       outletCount: partner.outletCount || 1,
       royaltyPercent: partner.royaltyPercent ?? 8,
-      onboardingProgress: Math.round((stepsDone / 6) * 100),
+      onboardingProgress: Math.round((stepsDone / AGENCY_ONBOARDING_KEYS.length) * 100),
+      teamSize: team.length,
     },
     onboarding,
     monthlyTrend,
+    team,
     marketingKit: [
       { title: 'Brand Guidelines PDF', type: 'document', url: '#' },
-      { title: 'Centre Launch Checklist', type: 'document', url: '#' },
+      { title: 'Agency Launch Checklist', type: 'document', url: '#' },
       { title: 'Social Media Templates', type: 'media', url: '#' },
       { title: 'Parent Orientation Deck', type: 'presentation', url: '#' },
+      { title: 'Lead Conversion Playbook', type: 'document', url: '#' },
+      { title: 'Commission Structure Guide', type: 'document', url: '#' },
     ],
   };
 }
 
-export function updateFranchiseOnboarding(partnerId, updates) {
+/** @deprecated */
+export const getFranchiseHubData = getAgencyHubData;
+
+export function updateAgencyOnboarding(partnerId, updates) {
   const partner = findUser({ id: partnerId });
-  if (!partner || partner.partnerType !== 'franchise') return null;
-  const onboarding = { ...(partner.franchiseOnboarding || {}), ...updates };
-  return updateUser(partnerId, { franchiseOnboarding: onboarding });
+  if (!partner || !isAgencyPartner(partner)) return null;
+  const onboarding = { ...(partner.agencyOnboarding || partner.franchiseOnboarding || {}), ...updates };
+  return updateUser(partnerId, { agencyOnboarding: onboarding });
 }
+
+/** @deprecated */
+export const updateFranchiseOnboarding = updateAgencyOnboarding;
+
+// ─── Staff & multi-role ───
+export function queryStaffUsers(filter = {}) {
+  let users = getUsers().filter((u) => isStaffRole(u.role));
+  if (filter.role && filter.role !== 'all') users = users.filter((u) => u.role === filter.role);
+  if (filter.search) {
+    const q = filter.search.toLowerCase();
+    users = users.filter(
+      (u) =>
+        (u.name || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q)
+    );
+  }
+  return sortByDate(users).map(userToSafeJSON);
+}
+
+export async function createStaffUser(data) {
+  if (!STAFF_ROLES.includes(data.role)) throw new Error('Invalid staff role');
+  const hash = await bcrypt.hash(data.password, 10);
+  return userToSafeJSON(
+    createUser({
+      ...data,
+      email: data.email.toLowerCase(),
+      password: hash,
+      status: data.status || 'active',
+      permissions: data.permissions || getDefaultPermissions(data.role),
+      partnerType: null,
+    })
+  );
+}
+
+export function getRolePermissions() {
+  const store = loadStore();
+  return store.settings.rolePermissions || {};
+}
+
+export function updateRolePermissions(rolePermissions) {
+  const store = loadStore();
+  store.settings.rolePermissions = { ...(store.settings.rolePermissions || {}), ...rolePermissions };
+  saveStore(store);
+  return store.settings.rolePermissions;
+}
+
+export function getProducts() {
+  return loadStore().settings.products || [];
+}
+
+export function updateProducts(products) {
+  const store = loadStore();
+  store.settings.products = products;
+  saveStore(store);
+  return products;
+}
+
+// ─── Students (from leads pipeline) ───
+export function leadToStudent(lead) {
+  return {
+    id: lead.id,
+    leadId: lead.leadId,
+    studentName: lead.studentName,
+    parentName: lead.parentName,
+    mobile: lead.studentPhone || lead.parentPhone,
+    alternateMobile: lead.alternatePhone || lead.parentPhone,
+    whatsapp: lead.whatsapp || lead.studentPhone,
+    email: lead.studentEmail,
+    dateOfBirth: lead.dateOfBirth,
+    gender: lead.gender,
+    classGrade: lead.classGrade,
+    school: lead.schoolCollege,
+    board: lead.board,
+    stream: lead.stream,
+    city: lead.city,
+    state: lead.state,
+    products: lead.interestedIn || [],
+    partnerId: lead.partnerId,
+    partnerName: lead.partnerName,
+    status: normalizeLeadStatus(lead.status),
+    assignedSalesId: lead.assignedSalesId || lead.assignedTo,
+    assignedCounsellorId: lead.assignedCounsellorId,
+    assignedReportId: lead.assignedReportId,
+    timeline: lead.statusHistory || [],
+    createdAt: lead.createdAt,
+    updatedAt: lead.updatedAt || lead.createdAt,
+  };
+}
+
+export function getStudents(filter = {}) {
+  const store = loadStore();
+  let students = store.students?.length
+    ? store.students
+    : store.leads.filter((l) => !['lost', 'new'].includes(normalizeLeadStatus(l.status))).map(leadToStudent);
+  if (filter.assignedSalesId) students = students.filter((s) => s.assignedSalesId === filter.assignedSalesId);
+  if (filter.assignedCounsellorId) students = students.filter((s) => s.assignedCounsellorId === filter.assignedCounsellorId);
+  if (filter.status && filter.status !== 'all') students = students.filter((s) => s.status === filter.status);
+  if (filter.search) {
+    const q = filter.search.toLowerCase();
+    students = students.filter(
+      (s) =>
+        (s.studentName || '').toLowerCase().includes(q) ||
+        (s.mobile || '').includes(q) ||
+        (s.leadId || '').toLowerCase().includes(q)
+    );
+  }
+  return sortByDate(students);
+}
+
+export function syncStudentsFromLeads() {
+  const store = loadStore();
+  store.students = store.leads
+    .filter((l) => !['lost'].includes(normalizeLeadStatus(l.status)))
+    .map(leadToStudent);
+  saveStore(store);
+  return store.students;
+}
+
+// ─── Tasks, sessions, reports ───
+export function getTasks(filter = {}) {
+  let tasks = loadStore().tasks || [];
+  if (filter.userId) tasks = tasks.filter((t) => t.assignedTo === filter.userId);
+  if (filter.status) tasks = tasks.filter((t) => t.status === filter.status);
+  return sortByDate(tasks);
+}
+
+export function createTask(data) {
+  const store = loadStore();
+  const task = { id: newId(), status: 'pending', createdAt: now(), ...data };
+  store.tasks.push(task);
+  saveStore(store);
+  return task;
+}
+
+export function updateTask(id, updates) {
+  const store = loadStore();
+  const idx = store.tasks.findIndex((t) => t.id === id);
+  if (idx < 0) return null;
+  store.tasks[idx] = { ...store.tasks[idx], ...updates, updatedAt: now() };
+  saveStore(store);
+  return store.tasks[idx];
+}
+
+export function getSessions(filter = {}) {
+  let sessions = loadStore().sessions || [];
+  if (filter.counsellorId) sessions = sessions.filter((s) => s.counsellorId === filter.counsellorId);
+  if (filter.studentId) sessions = sessions.filter((s) => s.studentId === filter.studentId);
+  return sortByDate(sessions);
+}
+
+export function createSession(data) {
+  const store = loadStore();
+  const session = { id: newId(), createdAt: now(), ...data };
+  store.sessions.push(session);
+  saveStore(store);
+  return session;
+}
+
+export function getReports(filter = {}) {
+  let reports = loadStore().reports || [];
+  if (filter.status) reports = reports.filter((r) => r.status === filter.status);
+  if (filter.assignedTo) reports = reports.filter((r) => r.assignedTo === filter.assignedTo);
+  return sortByDate(reports);
+}
+
+export function createReport(data) {
+  const store = loadStore();
+  const report = { id: newId(), status: 'pending', createdAt: now(), ...data };
+  store.reports.push(report);
+  saveStore(store);
+  return report;
+}
+
+export function updateReport(id, updates) {
+  const store = loadStore();
+  const idx = store.reports.findIndex((r) => r.id === id);
+  if (idx < 0) return null;
+  store.reports[idx] = { ...store.reports[idx], ...updates, updatedAt: now() };
+  saveStore(store);
+  return store.reports[idx];
+}
+
+export function getCallLogs(filter = {}) {
+  let logs = loadStore().callLogs || [];
+  if (filter.userId) logs = logs.filter((l) => l.userId === filter.userId);
+  return sortByDate(logs);
+}
+
+export function createCallLog(data) {
+  const store = loadStore();
+  const log = { id: newId(), createdAt: now(), ...data };
+  store.callLogs.push(log);
+  saveStore(store);
+  return log;
+}
+
+export function getStaffDashboard(user) {
+  const role = user.role;
+  const leads = getLeads();
+  const students = getStudents();
+  const tasks = getTasks({ userId: user.id });
+  const reports = getReports({ assignedTo: user.id });
+
+  const myLeads = leads.filter(
+    (l) => l.assignedSalesId === user.id || l.assignedTo === user.id || l.assignedCounsellorId === user.id
+  );
+
+  return {
+    role,
+    stats: {
+      totalLeads: role === 'sales_executive' ? myLeads.length : leads.length,
+      activeLeads: myLeads.filter((l) => !['completed', 'lost'].includes(normalizeLeadStatus(l.status))).length,
+      students: role === 'counsellor'
+        ? students.filter((s) => s.assignedCounsellorId === user.id).length
+        : students.length,
+      pendingTasks: tasks.filter((t) => t.status === 'pending').length,
+      pendingReports: reports.filter((r) => r.status === 'pending').length,
+      followUpsToday: myLeads.filter((l) => l.followUpDate && l.followUpDate.startsWith(new Date().toISOString().slice(0, 10))).length,
+    },
+    recentLeads: myLeads.slice(0, 8).map((l) => populateLead(l)),
+    recentTasks: tasks.slice(0, 5),
+    recentReports: reports.slice(0, 5),
+  };
+}
+
+// ─── Enterprise: Payments ───
+export function getPayments(filter = {}) {
+  let payments = loadStore().payments || [];
+  if (filter.leadId) payments = payments.filter((p) => p.leadId === filter.leadId);
+  if (filter.partnerId) payments = payments.filter((p) => p.partnerId === filter.partnerId);
+  if (filter.status) payments = payments.filter((p) => p.status === filter.status);
+  return sortByDate(payments).map((p) => {
+    const lead = findLead(p.leadId);
+    return { ...p, lead: lead ? { id: lead.id, leadId: lead.leadId, studentName: lead.studentName } : null };
+  });
+}
+
+export function createPayment(data) {
+  const store = loadStore();
+  const payment = { id: newId(), status: 'received', createdAt: now(), ...data };
+  store.payments.push(payment);
+  saveStore(store);
+  logAudit({ action: 'payment_created', entityType: 'payment', entityId: payment.id, details: `₹${payment.amount} for lead ${payment.leadId}`, userId: data.recordedBy });
+  return payment;
+}
+
+export function updatePayment(id, updates) {
+  const store = loadStore();
+  const idx = store.payments.findIndex((p) => p.id === id);
+  if (idx < 0) return null;
+  store.payments[idx] = { ...store.payments[idx], ...updates, updatedAt: now() };
+  saveStore(store);
+  return store.payments[idx];
+}
+
+// ─── Enterprise: Payout requests ───
+export function getPayoutRequests(filter = {}) {
+  let reqs = loadStore().payoutRequests || [];
+  if (filter.partnerId) reqs = reqs.filter((r) => r.partnerId === filter.partnerId);
+  if (filter.status) reqs = reqs.filter((r) => r.status === filter.status);
+  return sortByDate(reqs).map((r) => {
+    const partner = findUser({ id: r.partnerId });
+    return { ...r, partner: partner ? userToSafeJSON(partner) : null };
+  });
+}
+
+export function createPayoutRequest(data) {
+  const store = loadStore();
+  const req = { id: newId(), status: 'pending', createdAt: now(), ...data };
+  store.payoutRequests.push(req);
+  saveStore(store);
+  return req;
+}
+
+export function updatePayoutRequest(id, updates) {
+  const store = loadStore();
+  const idx = store.payoutRequests.findIndex((r) => r.id === id);
+  if (idx < 0) return null;
+  store.payoutRequests[idx] = { ...store.payoutRequests[idx], ...updates, updatedAt: now() };
+  saveStore(store);
+  return store.payoutRequests[idx];
+}
+
+// ─── Enterprise: Automations ───
+export function getAutomations() {
+  return loadStore().automations || [];
+}
+
+export function createAutomation(data) {
+  const store = loadStore();
+  const rule = { id: newId(), active: true, createdAt: now(), ...data };
+  store.automations.push(rule);
+  saveStore(store);
+  return rule;
+}
+
+export function updateAutomation(id, updates) {
+  const store = loadStore();
+  const idx = store.automations.findIndex((a) => a.id === id);
+  if (idx < 0) return null;
+  store.automations[idx] = { ...store.automations[idx], ...updates, updatedAt: now() };
+  saveStore(store);
+  return store.automations[idx];
+}
+
+export function deleteAutomation(id) {
+  const store = loadStore();
+  store.automations = (store.automations || []).filter((a) => a.id !== id);
+  saveStore(store);
+}
+
+export function computeCommissionAmount(lead, partner) {
+  const products = getProducts();
+  const interested = lead.interestedIn || [];
+  let total = 0;
+  if (interested.length) {
+    interested.forEach((label) => {
+      const prod = products.find((p) => p.label === label || p.id === label);
+      if (!prod) return;
+      if (prod.commission?.type === 'fixed') total += prod.commission.value;
+      else if (prod.commission?.type === 'percentage') total += (prod.price || 0) * (prod.commission.value / 100);
+    });
+  }
+  if (!total) total = (lead.expectedValue || 5000) * ((partner?.commissionRate || 10) / 100);
+  return Math.round(total);
+}
+
+// ─── Enterprise: Audit log (append-only) ───
+export function logAudit({ userId, userName, action, entityType, entityId, details, meta = {} }) {
+  const store = loadStore();
+  if (!store.auditLog) store.auditLog = [];
+  store.auditLog.unshift({
+    id: newId(),
+    userId: userId || 'system',
+    userName: userName || 'System',
+    action,
+    entityType,
+    entityId,
+    details,
+    meta,
+    createdAt: now(),
+  });
+  if (store.auditLog.length > 5000) store.auditLog = store.auditLog.slice(0, 5000);
+  saveStore(store);
+}
+
+export function getAuditLog(limit = 100) {
+  return (loadStore().auditLog || []).slice(0, limit);
+}
+
+// ─── Enterprise: Team members (agency sub-accounts) ───
+export function getTeamMembers(filter = {}) {
+  let members = loadStore().teamMembers || [];
+  if (filter.agencyId) members = members.filter((m) => m.agencyId === filter.agencyId);
+  return members;
+}
+
+export function createTeamMember(data) {
+  const store = loadStore();
+  const member = { id: newId(), status: 'active', createdAt: now(), ...data };
+  store.teamMembers.push(member);
+  saveStore(store);
+  return member;
+}
+
+export function deleteTeamMember(id) {
+  const store = loadStore();
+  store.teamMembers = (store.teamMembers || []).filter((m) => m.id !== id);
+  saveStore(store);
+}
+
+// ─── Enterprise: Calendar events ───
+export function getCalendarEvents(filter = {}) {
+  const events = [];
+  const leads = getLeads();
+  leads.forEach((l) => {
+    if (l.followUpDate) {
+      events.push({ id: `fu-${l.id}`, type: 'follow_up', title: `Follow-up: ${l.studentName}`, date: l.followUpDate, leadId: l.id, color: '#f59e0b' });
+    }
+  });
+  getTasks().forEach((t) => {
+    if (t.dueDate) events.push({ id: `task-${t.id}`, type: 'task', title: t.title, date: t.dueDate, taskId: t.id, color: '#3b82f6' });
+  });
+  getSessions().forEach((s) => {
+    if (s.scheduledAt) events.push({ id: `sess-${s.id}`, type: 'session', title: s.title || 'Counselling Session', date: s.scheduledAt, sessionId: s.id, color: '#8b5cf6' });
+  });
+  let filtered = events;
+  if (filter.from) filtered = filtered.filter((e) => e.date >= filter.from);
+  if (filter.to) filtered = filtered.filter((e) => e.date <= filter.to);
+  return filtered.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function deleteTask(id) {
+  const store = loadStore();
+  store.tasks = (store.tasks || []).filter((t) => t.id !== id);
+  saveStore(store);
+}
+
+export function getEnterpriseDashboard() {
+  const store = loadStore();
+  const leads = getLeads();
+  const payments = store.payments || [];
+  const payouts = store.payoutRequests || [];
+  const overdue = leads.filter((l) => l.followUpDate && l.followUpDate < new Date().toISOString().slice(0, 10) && !['completed', 'lost'].includes(normalizeLeadStatus(l.status)));
+  return {
+    totalRevenue: payments.filter((p) => p.status === 'received').reduce((s, p) => s + (p.amount || 0), 0),
+    pendingPayouts: payouts.filter((p) => p.status === 'pending').length,
+    pendingPayoutAmount: payouts.filter((p) => p.status === 'pending').reduce((s, p) => s + (p.amount || 0), 0),
+    slaBreaches: overdue.length,
+    activeAutomations: (store.automations || []).filter((a) => a.active).length,
+    teamMembers: (store.teamMembers || []).length,
+    agencies: store.users.filter((u) => u.role === 'partner' && (u.partnerType === 'agency' || u.partnerType === 'franchise')).length,
+  };
+}
+

@@ -3,6 +3,7 @@ import * as db from '../lib/db.js';
 import { LEAD_STATUSES } from '../models/Lead.js';
 import { authRequired, loadUser, partnerOnly, activePartnerOnly } from '../middleware/auth.js';
 import { generateLeadId, notifyUser } from '../utils/helpers.js';
+import { normalizeLeadInput } from '../utils/leadHelpers.js';
 
 const router = Router();
 
@@ -13,20 +14,37 @@ router.patch('/welcome-seen', (req, res) => {
   res.json({ user: db.userToSafeJSON(user) });
 });
 
-router.patch('/franchise-onboarding', activePartnerOnly, (req, res) => {
-  if (req.user.partnerType !== 'franchise') {
-    return res.status(403).json({ message: 'Franchise hub is only for franchise partners' });
+router.patch('/agency-onboarding', activePartnerOnly, (req, res) => {
+  if (!['agency', 'franchise'].includes(req.user.partnerType)) {
+    return res.status(403).json({ message: 'Agency hub is only for agency partners' });
   }
-  const updated = db.updateFranchiseOnboarding(req.user.id, req.body);
-  res.json({ onboarding: updated.franchiseOnboarding });
+  const updated = db.updateAgencyOnboarding(req.user.id, req.body);
+  res.json({ onboarding: updated.agencyOnboarding });
+});
+
+router.patch('/franchise-onboarding', activePartnerOnly, (req, res) => {
+  if (!['agency', 'franchise'].includes(req.user.partnerType)) {
+    return res.status(403).json({ message: 'Agency hub is only for agency partners' });
+  }
+  const updated = db.updateAgencyOnboarding(req.user.id, req.body);
+  res.json({ onboarding: updated.agencyOnboarding });
+});
+
+router.get('/agency-hub', activePartnerOnly, (req, res) => {
+  if (!['agency', 'franchise'].includes(req.user.partnerType)) {
+    return res.status(403).json({ message: 'Agency hub is only for agency partners' });
+  }
+  const data = db.getAgencyHubData(req.user.id);
+  if (!data) return res.status(404).json({ message: 'Agency data not found' });
+  res.json(data);
 });
 
 router.get('/franchise-hub', activePartnerOnly, (req, res) => {
-  if (req.user.partnerType !== 'franchise') {
-    return res.status(403).json({ message: 'Franchise hub is only for franchise partners' });
+  if (!['agency', 'franchise'].includes(req.user.partnerType)) {
+    return res.status(403).json({ message: 'Agency hub is only for agency partners' });
   }
-  const data = db.getFranchiseHubData(req.user.id);
-  if (!data) return res.status(404).json({ message: 'Franchise data not found' });
+  const data = db.getAgencyHubData(req.user.id);
+  if (!data) return res.status(404).json({ message: 'Agency data not found' });
   res.json(data);
 });
 
@@ -61,85 +79,66 @@ router.get('/dashboard', activePartnerOnly, (req, res) => {
 });
 
 router.get('/leads', activePartnerOnly, (req, res) => {
-  const { status, search } = req.query;
-  const leads = db.getLeads({ partnerId: req.user.id, status, search }).map((l) => ({ ...l, _id: l.id }));
+  const { status, search, leadType } = req.query;
+  const leads = db.getLeads({ partnerId: req.user.id, status, search, leadType }).map((l) => ({ ...l, _id: l.id }));
   res.json({ leads, total: leads.length, page: 1, pages: 1 });
 });
 
 router.post('/leads', activePartnerOnly, async (req, res) => {
-  const {
-    studentName, studentPhone, studentEmail, parentName, parentPhone,
-    classGrade, stream, city, state, schoolCollege, interestedIn, notes, priority,
-    gender, dateOfBirth, budget, preferredContactTime, pincode, whatsappOptIn,
-  } = req.body;
+  try {
+    const normalized = normalizeLeadInput(req.body);
 
-  if (!studentName?.trim() || !studentPhone?.trim()) {
-    return res.status(400).json({ message: 'Student name and phone are required' });
-  }
+    const phone = normalized.contactPhone || normalized.studentPhone;
+    const duplicates = db.findDuplicateLeads(phone);
+    if (duplicates.length) {
+      return res.status(409).json({
+        message: 'A lead with this phone number already exists',
+        duplicates: duplicates.map((d) => ({ leadId: d.leadId, studentName: d.studentName, status: d.status })),
+      });
+    }
 
-  const duplicates = db.findDuplicateLeads(studentPhone);
-  if (duplicates.length) {
-    return res.status(409).json({
-      message: 'A lead with this phone number already exists',
-      duplicates: duplicates.map((d) => ({ leadId: d.leadId, studentName: d.studentName, status: d.status })),
-    });
-  }
+    let leadId = generateLeadId();
+    while (db.getLeads().find((l) => l.leadId === leadId)) leadId = generateLeadId();
 
-  let leadId = generateLeadId();
-  while (db.getLeads().find((l) => l.leadId === leadId)) leadId = generateLeadId();
-
-  const lead = db.createLead({
-    leadId,
-    studentName: studentName.trim(),
-    studentPhone: studentPhone.trim(),
-    studentEmail: studentEmail?.trim().toLowerCase() || '',
-    parentName: parentName?.trim() || '',
-    parentPhone: parentPhone?.trim() || '',
-    classGrade: classGrade?.trim() || '',
-    stream: stream?.trim() || '',
-    city: city?.trim() || req.user.city || '',
-    state: state?.trim() || req.user.state || '',
-    schoolCollege: schoolCollege?.trim() || req.user.organization || '',
-    interestedIn: Array.isArray(interestedIn) ? interestedIn : [],
-    notes: notes?.trim() || '',
-    priority: priority || 'medium',
-    gender: gender || '',
-    dateOfBirth: dateOfBirth || '',
-    budget: budget || '',
-    preferredContactTime: preferredContactTime || '',
-    pincode: pincode || '',
-    whatsappOptIn: !!whatsappOptIn,
-    status: 'new',
-    source: 'partner_referral',
-    partnerId: req.user.id,
-    partnerName: req.user.name,
-    partnerType: req.user.partnerType,
-    statusHistory: [{
+    const lead = db.createLead({
+      ...normalized,
+      leadId,
+      city: normalized.city || req.user.city || '',
+      state: normalized.state || req.user.state || '',
+      schoolCollege: normalized.schoolCollege || req.user.organization || '',
+      partnerId: req.user.id,
+      partnerName: req.user.name,
+      partnerType: req.user.partnerType,
       status: 'new',
-      note: 'Lead submitted by partner',
-      updatedBy: req.user.id,
-      updatedByName: req.user.name,
-      createdAt: new Date().toISOString(),
-    }],
-  });
+      statusHistory: [{
+        status: 'new',
+        note: `Lead submitted by partner (${normalized.leadType === 'business' ? 'B2B' : 'B2C'})`,
+        updatedBy: req.user.id,
+        updatedByName: req.user.name,
+        createdAt: new Date().toISOString(),
+      }],
+    });
 
-  db.updateUser(req.user.id, { totalLeads: (req.user.totalLeads || 0) + 1 });
-  db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'lead_created', entityType: 'lead', entityId: lead.id, details: lead.studentName });
+    db.updateUser(req.user.id, { totalLeads: (req.user.totalLeads || 0) + 1 });
+    db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'lead_created', entityType: 'lead', entityId: lead.id, details: lead.studentName });
 
-  const admins = db.getUsers().filter((u) => u.role === 'admin' && u.status === 'active');
-  await Promise.all(
-    admins.map((admin) =>
-      notifyUser(admin.id, {
-        title: 'New lead received',
-        message: `${req.user.name} submitted lead for ${lead.studentName}`,
-        type: 'lead_update',
-        link: '/admin?tab=leads',
-        meta: { leadId: lead.id },
-      })
-    )
-  );
+    const admins = db.getUsers().filter((u) => (u.role === 'admin' || u.role === 'super_admin') && u.status === 'active');
+    await Promise.all(
+      admins.map((admin) =>
+        notifyUser(admin.id, {
+          title: 'New lead received',
+          message: `${req.user.name} submitted ${normalized.leadType === 'business' ? 'B2B' : 'B2C'} lead for ${lead.studentName}`,
+          type: 'lead_update',
+          link: '/admin?tab=leads',
+          meta: { leadId: lead.id },
+        })
+      )
+    );
 
-  res.status(201).json({ lead: { ...lead, _id: lead.id }, message: 'Lead submitted successfully' });
+    res.status(201).json({ lead: { ...lead, _id: lead.id }, message: 'Lead submitted successfully' });
+  } catch (e) {
+    res.status(e.status || 400).json({ message: e.message || 'Failed to create lead' });
+  }
 });
 
 router.get('/leads/:id', activePartnerOnly, (req, res) => {
@@ -241,6 +240,32 @@ router.put('/payout-details', activePartnerOnly, (req, res) => {
   const { bankAccount, ifsc, upiId, panNumber } = req.body;
   const user = db.updateUser(req.user.id, { bankAccount, ifsc, upiId, panNumber });
   res.json({ user: db.userToSafeJSON(user) });
+});
+
+router.get('/payout-requests', activePartnerOnly, (req, res) => {
+  res.json({ requests: db.getPayoutRequests({ partnerId: req.user.id }) });
+});
+
+router.post('/payout-request', activePartnerOnly, (req, res) => {
+  const commissions = db.getCommissions({ partnerId: req.user.id });
+  const available = commissions
+    .filter((c) => c.status === 'approved')
+    .reduce((s, c) => s + c.amount, 0);
+  const amount = Number(req.body.amount) || available;
+  const settings = db.getSettings();
+  if (amount < (settings.minPayoutAmount || 500)) {
+    return res.status(400).json({ message: `Minimum payout is ₹${settings.minPayoutAmount || 500}` });
+  }
+  if (amount > available) {
+    return res.status(400).json({ message: `Only ₹${available} available for payout` });
+  }
+  const request = db.createPayoutRequest({
+    partnerId: req.user.id,
+    amount,
+    method: req.body.method || 'bank',
+    notes: req.body.notes || '',
+  });
+  res.status(201).json({ request });
 });
 
 function getTopInterests(leads) {

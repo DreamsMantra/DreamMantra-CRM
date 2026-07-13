@@ -26,18 +26,18 @@ const partnerTypes = [
   { icon: GraduationCap, title: 'Colleges', desc: 'Connect students to Dream Mantra programs' },
   { icon: BookOpen, title: 'Coaching Centers', desc: 'Partner for DMIT, psychometric & skill mapping' },
   { icon: Users, title: 'Teachers', desc: 'Individual educators referring motivated students' },
-  { icon: Store, title: 'Franchise Partners', desc: 'Own a Dream Mantra centre with territory rights, marketing kit & revenue share' },
+  { icon: Store, title: 'Agency Partners', desc: 'Own a Dream Mantra centre with territory rights, marketing kit & revenue share' },
 ];
 
-const franchiseFeatures = [
-  { icon: MapPin, title: 'Exclusive Territory', desc: 'Operate in your city/region with protected franchise rights and branded centre support.' },
-  { icon: Target, title: 'Lead Targets & KPIs', desc: 'Monthly lead goals, conversion tracking, and performance dashboards built for franchise growth.' },
-  { icon: Store, title: 'Multi-Outlet Model', desc: 'Scale from single outlet to master franchise with outlet tracking and royalty management.' },
-  { icon: IndianRupee, title: 'Higher Commission', desc: 'Premium 15% commission tier, royalty transparency, and faster payout cycles for franchise partners.' },
+const agencyFeatures = [
+  { icon: MapPin, title: 'Exclusive Territory', desc: 'Operate in your city/region with protected agency rights and branded centre support.' },
+  { icon: Target, title: 'Lead Targets & KPIs', desc: 'Monthly lead goals, conversion tracking, and performance dashboards built for agency growth.' },
+  { icon: Store, title: 'Multi-Centre Model', desc: 'Scale from single centre to master agency with outlet tracking and royalty management.' },
+  { icon: IndianRupee, title: 'Higher Commission', desc: 'Premium 15% commission tier, royalty transparency, and faster payout cycles for agency partners.' },
 ];
 
 const faqs = [
-  { q: 'How do I apply for a franchise?', a: 'Click "Apply for Franchise" on the homepage, fill in your territory and investment details, and our team will review your application within 48 hours.' },
+  { q: 'How do I apply for an agency?', a: 'Click "Apply for Agency" on the homepage, fill in your territory and investment details, and our team will review your application within 48 hours.' },
   { q: 'How do I become a partner?', a: 'Register on our portal, fill in your organization details, and wait for admin approval (usually 24-48 hours).' },
   { q: 'When do I earn commission?', a: 'Commission is auto-generated when a lead you referred is marked as "Converted" by our counsellors.' },
   { q: 'Can I import leads in bulk?', a: 'Yes! Use the Bulk Import feature to paste CSV data with student name, phone, class, and city.' },
@@ -64,14 +64,14 @@ export default function Home() {
               <span className="dm-gradient-text">Referral Partners</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-stone-600">
-              Complete lead management for schools, colleges, coaching centers, teachers & franchise partners.
+              Complete lead management for schools, colleges, coaching centers, teachers & agency partners.
               Submit leads, track counselling, earn commissions — all in one powerful portal.
             </p>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
               <Link to="/signup" className="dm-btn-primary px-8 py-3 text-base">
                 Become a Partner <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link to="/signup?type=franchise" className="dm-btn-gold px-8 py-3 text-base">Apply for Franchise</Link>
+              <Link to="/signup?type=agency" className="dm-btn-gold px-8 py-3 text-base">Apply for Agency</Link>
               <Link to="/login" className="dm-btn-ghost px-8 py-3 text-base">Partner Login</Link>
             </div>
           </motion.div>
@@ -123,20 +123,20 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="franchise" className="border-t border-stone-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 px-4 py-20">
+      <section id="agency" className="border-t border-stone-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 px-4 py-20">
         <div className="mx-auto max-w-7xl">
           <div className="text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-white px-4 py-1.5 text-sm font-semibold text-gold-dark">
-              <Store className="h-4 w-4" /> Dream Mantra Franchise Program
+              <Store className="h-4 w-4" /> Dream Mantra Agency Program
             </span>
             <h2 className="mt-4 font-display text-3xl font-bold text-stone-900">Own a Career Counselling Centre</h2>
             <p className="mx-auto mt-3 max-w-2xl text-stone-600">
-              Launch your Dream Mantra franchise with territory rights, onboarding support, marketing kit, and a dedicated Franchise Hub in the CRM.
+              Launch your Dream Mantra agency with territory rights, onboarding support, marketing kit, and a dedicated Agency Hub in the CRM.
             </p>
-            <Link to="/signup?type=franchise" className="dm-btn-gold mt-8 inline-flex px-8 py-3">Apply for Franchise</Link>
+            <Link to="/signup?type=agency" className="dm-btn-gold mt-8 inline-flex px-8 py-3">Apply for Agency</Link>
           </div>
           <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {franchiseFeatures.map((f) => (
+            {agencyFeatures.map((f) => (
               <div key={f.title} className="dm-card p-6">
                 <div className="mb-4 inline-flex rounded-xl bg-gold/15 p-3 text-gold-dark"><f.icon className="h-6 w-6" /></div>
                 <h3 className="font-display font-bold text-stone-900">{f.title}</h3>

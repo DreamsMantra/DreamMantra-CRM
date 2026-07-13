@@ -7,6 +7,9 @@ echo ============================================
 echo   MongoDB Atlas Setup - Dream Mantra CRM
 echo ============================================
 echo.
+echo IMPORTANT: Log in with dreammantra1@gmail.com ONLY
+echo   Do NOT use eshalohiya45@gmail.com or other accounts.
+echo.
 echo Opening MongoDB Atlas API Keys page...
 echo   1. Organization -^> Access Manager -^> API Keys
 echo   2. Create API Key (Organization Project Creator)

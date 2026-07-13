@@ -11,19 +11,19 @@ import { api } from '../api';
 export default function Signup() {
   const { register } = useAuth();
   const [params] = useSearchParams();
-  const isFranchise = params.get('type') === 'franchise';
+  const isAgency = params.get('type') === 'agency' || params.get('type') === 'franchise';
 
   const [form, setForm] = useState({
     name: '',
     email: '',
     phone: '',
     password: '',
-    partnerType: isFranchise ? 'franchise' : 'teacher',
+    partnerType: isAgency ? 'agency' : 'teacher',
     organization: '',
     city: '',
     state: 'Rajasthan',
     address: '',
-    franchiseName: '',
+    agencyName: '',
     territory: '',
     outletCount: 1,
     investmentTier: 'starter',
@@ -65,8 +65,8 @@ export default function Signup() {
           <CheckCircle className="mx-auto h-14 w-14 text-emerald-400" />
           <h2 className="mt-4 font-display text-2xl font-bold text-stone-900">Registration Submitted!</h2>
           <p className="mt-2 text-stone-600">
-            {form.partnerType === 'franchise'
-              ? 'Your franchise application is under review. Our team will contact you within 48 hours.'
+            {form.partnerType === 'agency'
+              ? 'Your agency application is under review. Our team will contact you within 48 hours.'
               : 'Your partner account is pending admin approval. You will be notified once activated.'}
           </p>
           <Link to="/login" className="dm-btn-primary mt-6 inline-flex">Go to Sign In</Link>
@@ -81,20 +81,20 @@ export default function Signup() {
         <div className="mb-8 text-center">
           <Logo className="justify-center" />
           <h1 className="mt-4 font-display text-3xl font-bold text-stone-900">
-            {form.partnerType === 'franchise' ? 'Franchise Application' : 'Join Partner Network'}
+            {form.partnerType === 'agency' ? 'Agency Application' : 'Join Partner Network'}
           </h1>
           <p className="mt-2 text-stone-600">
-            {form.partnerType === 'franchise'
+            {form.partnerType === 'agency'
               ? 'Apply to open a Dream Mantra career counselling centre in your territory'
               : 'Schools, colleges, teachers, coaching centers & referral partners'}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="dm-card space-y-5 p-8">
-          {form.partnerType === 'franchise' && (
+          {form.partnerType === 'agency' && (
             <div className="flex items-start gap-3 rounded-xl border border-gold/30 bg-gold/5 p-4 text-sm text-stone-700">
               <Store className="mt-0.5 h-5 w-5 shrink-0 text-gold-dark" />
-              <p>Franchise partners get a dedicated Franchise Hub, territory tracking, marketing kit, and premium 15% commission on conversions.</p>
+              <p>Agency partners get a dedicated Agency Hub, territory tracking, marketing kit, and premium 15% commission on conversions.</p>
             </div>
           )}
 
@@ -136,11 +136,11 @@ export default function Signup() {
               </div>
             </div>
 
-            {form.partnerType === 'franchise' && show('franchiseName') && (
+            {form.partnerType === 'agency' && show('agencyName') && (
               <>
                 <div className="sm:col-span-2">
-                  <label className="dm-label">Franchise / Centre Name *</label>
-                  <input className="dm-input" value={form.franchiseName} onChange={(e) => update('franchiseName', e.target.value)} placeholder="Dream Mantra Jaipur Centre" required />
+                  <label className="dm-label">Agency / Centre Name *</label>
+                  <input className="dm-input" value={form.agencyName} onChange={(e) => update('agencyName', e.target.value)} placeholder="Dream Mantra Jaipur Centre" required />
                 </div>
                 <div>
                   <label className="dm-label">Territory / City Rights *</label>
@@ -170,7 +170,7 @@ export default function Signup() {
             )}
 
             <div className="sm:col-span-2">
-              <label className="dm-label">{form.partnerType === 'franchise' ? 'Company / Entity Name' : 'Organization / School / College Name'}</label>
+              <label className="dm-label">{form.partnerType === 'agency' ? 'Company / Entity Name' : 'Organization / School / College Name'}</label>
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
                 <input className="dm-input pl-10" value={form.organization} onChange={(e) => update('organization', e.target.value)} />
@@ -197,7 +197,7 @@ export default function Signup() {
 
           <button type="submit" disabled={loading} className="dm-btn-primary w-full">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {form.partnerType === 'franchise' ? 'Submit Franchise Application' : 'Submit Registration'}
+            {form.partnerType === 'agency' ? 'Submit Agency Application' : 'Submit Registration'}
           </button>
 
           <p className="text-center text-sm text-stone-500">

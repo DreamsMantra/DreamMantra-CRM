@@ -1,5 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import DashboardSection from '../components/layout/DashboardSection';
+import SectionBlock from '../components/layout/SectionBlock';
+import { resolvePartnerRoute, getPartnerGroups } from '../config/partnerTabs';
 import {
   LayoutDashboard, Users, IndianRupee, UserCircle, Plus, Search, Copy, CheckCircle,
   Clock, AlertCircle, Bell, BarChart3, Trophy, Calendar, Upload, CreditCard, Lock,
@@ -17,32 +20,34 @@ import FollowUpList from '../components/FollowUpList';
 import BulkLeadImport from '../components/BulkLeadImport';
 import ExportButton from '../components/ExportButton';
 import LeadComments from '../components/LeadComments';
-import FranchiseHub from '../components/FranchiseHub';
+import AgencyHub from '../components/AgencyHub';
 import ChatMessenger from '../components/ChatMessenger';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { getNavForRole, getDashboardTitle, AGENCY_TYPES } from '../config/roleNavigation';
+import { leadDisplayName, leadDisplayPhone } from '../config/adminTabs';
 import { LEAD_STATUSES, formatDate, formatCurrency, partnerTypeLabel, PARTNER_TIERS } from '../utils/constants';
 
-const baseLinks = [
-  { to: '/partner', label: 'Overview', icon: LayoutDashboard, end: true },
-  { to: '/partner?tab=leads', label: 'My Leads', icon: Users },
-  { to: '/partner?tab=add-lead', label: 'Add Lead', icon: Plus },
-  { to: '/partner?tab=bulk', label: 'Bulk Import', icon: Upload },
-  { to: '/partner?tab=follow-ups', label: 'Follow-ups', icon: Calendar },
-  { to: '/partner?tab=commissions', label: 'Commissions', icon: IndianRupee },
-  { to: '/partner?tab=reports', label: 'Reports', icon: BarChart3 },
-  { to: '/partner?tab=leaderboard', label: 'Leaderboard', icon: Trophy },
-  { to: '/partner?tab=payout', label: 'Payout Details', icon: CreditCard },
-  { to: '/partner?tab=profile', label: 'Profile', icon: UserCircle },
-  { to: '/partner?tab=password', label: 'Security', icon: Lock },
-  { to: '/partner?tab=notifications', label: 'Notifications', icon: Bell },
-  { to: '/partner?tab=messages', label: 'Messages', icon: MessageCircle },
+const MARKETING_KIT = [
+  { title: 'Dream Mantra Brochure', type: 'PDF' },
+  { title: 'Social Media Templates', type: 'Canva' },
+  { title: 'WhatsApp Message Scripts', type: 'Doc' },
+  { title: 'Partner Presentation Deck', type: 'PPT' },
+];
+
+const TRAINING_RESOURCES = [
+  { title: 'How to Submit Quality Leads', duration: '15 min' },
+  { title: 'Brain Mapping Product Overview', duration: '20 min' },
+  { title: 'Commission & Payout Guide', duration: '10 min' },
+  { title: 'Agency Team Onboarding', duration: '25 min' },
 ];
 
 export default function PartnerDashboard() {
   const { user, refreshUser, token } = useAuth();
   const [params, setParams] = useSearchParams();
-  const tab = params.get('tab') || 'overview';
+  const { tab, pageInfo, alias } = resolvePartnerRoute(params);
+
+  const [leadModal, setLeadModal] = useState(false);
 
   const [dashboard, setDashboard] = useState(null);
   const [reports, setReports] = useState(null);
@@ -72,13 +77,17 @@ export default function PartnerDashboard() {
     api.auth.formTemplate('lead').then((r) => setLeadTemplateFields(r.fields || [])).catch(() => {});
   }, []);
 
-  const sidebarLinks = [
-    ...baseLinks,
-    ...(user?.partnerType === 'franchise' ? [{ to: '/partner?tab=franchise', label: 'Franchise Hub', icon: Store }] : []),
-  ].map((l) => ({
+  const sidebarLinks = getNavForRole('partner', user?.partnerType).map((l) => ({
     ...l,
-    badge: l.label === 'Notifications' ? notifications.unread : l.label === 'Follow-ups' ? followUps.overdue?.length : 0,
+    badge: l.tab === 'leads' ? followUps.overdue?.length : 0,
   }));
+
+  useEffect(() => {
+    if (alias?.openLeadModal) {
+      setLeadModal(true);
+      setParams({ tab: 'leads' }, { replace: true });
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,10 +145,10 @@ export default function PartnerDashboard() {
     setError('');
     try {
       await api.partner.createLead(leadForm);
-      setMessage('Lead submitted successfully!');
+      setMessage('Lead submitted!');
       setLeadForm(emptyLeadForm);
       setPhoneCheck(null);
-      setParams({ tab: 'leads' });
+      setLeadModal(false);
       load();
     } catch (err) {
       setError(err.message);
@@ -178,6 +187,11 @@ export default function PartnerDashboard() {
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
+  const setTab = (t) => {
+    if (t === 'overview') setParams({});
+    else setParams({ tab: t });
+  };
+
   if (user?.status === 'pending') {
     return (
       <DashboardLayout sidebarLinks={sidebarLinks} title="Partner Portal">
@@ -192,7 +206,13 @@ export default function PartnerDashboard() {
   }
 
   return (
-    <DashboardLayout sidebarLinks={sidebarLinks} title="Partner Portal" badge={notifications.unread}>
+    <DashboardLayout
+      sidebarLinks={sidebarLinks}
+      activeTab={tab}
+      onTabChange={setTab}
+      title={getDashboardTitle('partner', user?.partnerType)}
+      badge={notifications.unread}
+    >
       <AnnouncementBanner announcements={announcements} />
       {user?.welcomePending && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gold/30 bg-gradient-to-r from-gold/10 to-orange/5 p-5">
@@ -215,7 +235,7 @@ export default function PartnerDashboard() {
       {error && <div className="dm-alert-error mb-4"><AlertCircle className="h-4 w-4" /> {error}</div>}
 
       {tab === 'overview' && (
-        <div className="space-y-6">
+        <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
           <div className="dm-card flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
               <p className="text-sm text-stone-500">Welcome back</p>
@@ -260,8 +280,21 @@ export default function PartnerDashboard() {
               </div>
 
               {(followUps.overdue?.length > 0) && (
-                <div className="dm-alert-warning"><AlertCircle className="h-4 w-4" /> You have {followUps.overdue.length} overdue follow-up(s). <button type="button" className="font-semibold underline" onClick={() => setParams({ tab: 'follow-ups' })}>View</button></div>
+                <div className="dm-alert-warning"><AlertCircle className="h-4 w-4" /> {followUps.overdue.length} overdue follow-up(s) on your leads.</div>
               )}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button type="button" onClick={() => { setLeadForm({ ...emptyLeadForm, leadType: 'student' }); setLeadModal(true); }} className="dm-card p-5 text-left hover:border-orange/40 hover:shadow-md transition">
+                  <Plus className="mb-2 h-6 w-6 text-orange" />
+                  <p className="font-semibold">Add Student Lead</p>
+                  <p className="text-xs text-stone-500">Quick B2C — name & phone</p>
+                </button>
+                <button type="button" onClick={() => { setLeadForm({ ...emptyLeadForm, leadType: 'business' }); setLeadModal(true); }} className="dm-card p-5 text-left hover:border-indigo-300 hover:shadow-md transition">
+                  <Plus className="mb-2 h-6 w-6 text-indigo-600" />
+                  <p className="font-semibold">Add Business Lead</p>
+                  <p className="text-xs text-stone-500">School / college / B2B</p>
+                </button>
+              </div>
 
               <div className="dm-card overflow-hidden">
                 <div className="flex items-center justify-between border-b border-stone-100 p-4">
@@ -284,13 +317,31 @@ export default function PartnerDashboard() {
                   </table>
                 </div>
               </div>
+
+              <div className="space-y-4">
+                {getPartnerGroups(AGENCY_TYPES.includes(user?.partnerType)).map((group) => (
+                  <SectionBlock key={group.id} title={group.label}>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {group.tabs.map((item) => (
+                        <button key={item.tab} type="button" onClick={() => setTab(item.tab)} className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-left text-sm font-medium text-stone-800 transition hover:border-gold/40 hover:bg-white">
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </SectionBlock>
+                ))}
+              </div>
             </>
           )}
-        </div>
+        </DashboardSection>
       )}
 
       {tab === 'leads' && (
-        <div className="space-y-4">
+        <DashboardSection
+          title={pageInfo.title}
+          description={pageInfo.desc}
+          actions={<button type="button" onClick={() => { setLeadForm(emptyLeadForm); setLeadModal(true); }} className="dm-btn-primary"><Plus className="h-4 w-4" /> Add Lead</button>}
+        >
           <div className="flex flex-wrap gap-3">
             <div className="relative min-w-[200px] flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
@@ -305,14 +356,15 @@ export default function PartnerDashboard() {
           </div>
           <div className="dm-card overflow-x-auto">
             <table className="dm-table w-full">
-              <thead><tr><th>Lead ID</th><th>Student</th><th>Phone</th><th>Class</th><th>Status</th><th>Priority</th><th>Updated</th></tr></thead>
+              <thead><tr><th>Lead ID</th><th>Type</th><th>Name / Contact</th><th>Phone</th><th>Class / Org</th><th>Status</th><th>Priority</th><th>Updated</th></tr></thead>
               <tbody>
                 {leads.map((lead) => (
                   <tr key={lead.id || lead._id} className="cursor-pointer" onClick={() => openLead(lead)}>
                     <td className="font-mono text-gold-dark">{lead.leadId}</td>
-                    <td className="font-medium">{lead.studentName}</td>
-                    <td>{lead.studentPhone}</td>
-                    <td>{lead.classGrade || '—'}</td>
+                    <td><span className={`dm-badge text-xs ${lead.leadType === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>{lead.leadType === 'business' ? 'B2B' : 'B2C'}</span></td>
+                    <td className="font-medium">{leadDisplayName(lead)}</td>
+                    <td>{leadDisplayPhone(lead)}</td>
+                    <td>{lead.leadType === 'business' ? (lead.businessType || '—') : (lead.classGrade || '—')}</td>
                     <td><StatusBadge status={lead.status} /></td>
                     <td><span className={`dm-badge capitalize ${lead.priority === 'high' ? 'bg-red-100 text-red-700' : lead.priority === 'low' ? 'bg-stone-100 text-stone-600' : 'bg-amber-100 text-amber-700'}`}>{lead.priority}</span></td>
                     <td className="text-stone-400">{formatDate(lead.updatedAt)}</td>
@@ -322,54 +374,38 @@ export default function PartnerDashboard() {
             </table>
             {!leads.length && <p className="p-8 text-center text-stone-400">No leads found</p>}
           </div>
-        </div>
-      )}
-
-      {tab === 'add-lead' && (
-        <div className="mx-auto max-w-3xl dm-card p-6">
-          <h2 className="mb-2 font-display text-xl font-bold text-stone-900">Submit New Student Lead</h2>
-          <p className="mb-6 text-sm text-stone-500">Fill in student details. Duplicate phone numbers are automatically detected.</p>
-          {phoneCheck && (
-            <div className="dm-alert-warning mb-4">
-              Possible duplicate: {phoneCheck.map((d) => `${d.studentName} (${d.leadId})`).join(', ')}
-            </div>
-          )}
-          <LeadForm
-            form={leadForm}
-            templateFields={leadTemplateFields}
-            onChange={(f) => { setLeadForm(f); if (f.studentPhone) checkPhone(f.studentPhone); }}
-            onSubmit={handleAddLead}
-            loading={submitting}
-          />
-        </div>
+        </DashboardSection>
       )}
 
       {tab === 'bulk' && (
-        <div className="mx-auto max-w-2xl dm-card p-6">
-          <h2 className="mb-4 font-display text-xl font-bold text-stone-900">Bulk Lead Import</h2>
+        <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
           <BulkLeadImport onImport={handleBulk} loading={submitting} />
-        </div>
+        </DashboardSection>
       )}
 
-      {tab === 'follow-ups' && <div className="dm-card p-6"><h2 className="mb-4 dm-section-title">Follow-up Reminders</h2><FollowUpList overdue={followUps.overdue} upcoming={followUps.upcoming} onSelect={openLead} /></div>}
+      {tab === 'follow-ups' && (
+        <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
+          <FollowUpList overdue={followUps.overdue} upcoming={followUps.upcoming} onSelect={openLead} />
+        </DashboardSection>
+      )}
 
-      {tab === 'commissions' && (
-        <div className="space-y-4">
+      {tab === 'money' && (
+        <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
           <div className="grid gap-4 sm:grid-cols-3">
             <StatCard label="Total Earned" value={formatCurrency(user?.totalEarnings)} accent="green" />
             <StatCard label="Pending" value={formatCurrency(commissions.filter((c) => c.status === 'pending' || c.status === 'approved').reduce((s, c) => s + c.amount, 0))} accent="gold" />
             <StatCard label="Paid" value={formatCurrency(commissions.filter((c) => c.status === 'paid').reduce((s, c) => s + c.amount, 0))} accent="blue" />
           </div>
           <div className="dm-card overflow-x-auto">
+            <div className="border-b border-stone-100 p-4"><h3 className="dm-section-title">Commission History</h3></div>
             <table className="dm-table w-full">
-              <thead><tr><th>Lead</th><th>Student</th><th>Amount</th><th>Rate</th><th>Status</th><th>Date</th></tr></thead>
+              <thead><tr><th>Lead</th><th>Name</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
               <tbody>
                 {commissions.map((c) => (
                   <tr key={c.id || c._id}>
                     <td className="font-mono text-gold-dark">{c.lead?.leadId}</td>
-                    <td>{c.lead?.studentName}</td>
+                    <td>{leadDisplayName(c.lead || {})}</td>
                     <td className="font-semibold text-emerald-600">{formatCurrency(c.amount)}</td>
-                    <td>{c.rate}%</td>
                     <td><span className="dm-badge bg-stone-100 capitalize text-stone-700">{c.status}</span></td>
                     <td className="text-stone-400">{formatDate(c.createdAt)}</td>
                   </tr>
@@ -377,7 +413,15 @@ export default function PartnerDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
+          <form onSubmit={async (e) => { e.preventDefault(); await api.partner.payoutDetails(payoutForm); setMessage('Payout details saved'); refreshUser(); }} className="mx-auto max-w-xl dm-card space-y-4 p-6">
+            <h2 className="font-display text-lg font-bold text-stone-900">Payout Details</h2>
+            <p className="text-sm text-stone-500">Bank / UPI for receiving commissions</p>
+            {['bankAccount', 'ifsc', 'upiId', 'panNumber'].map((f) => (
+              <div key={f}><label className="dm-label uppercase">{f}</label><input className="dm-input" value={payoutForm[f] || ''} onChange={(e) => setPayoutForm({ ...payoutForm, [f]: e.target.value })} /></div>
+            ))}
+            <button type="submit" className="dm-btn-primary">Save Payout Details</button>
+          </form>
+        </DashboardSection>
       )}
 
       {tab === 'reports' && reports && (
@@ -461,8 +505,8 @@ export default function PartnerDashboard() {
         </form>
       )}
 
-      {tab === 'franchise' && user?.partnerType === 'franchise' && (
-        <FranchiseHub onRefresh={load} />
+      {(tab === 'agency-hub' || tab === 'franchise') && ['agency', 'franchise'].includes(user?.partnerType) && (
+        <AgencyHub onRefresh={load} />
       )}
 
       {tab === 'messages' && (
@@ -481,6 +525,107 @@ export default function PartnerDashboard() {
           ))}
         </div>
       )}
+
+      {tab === 'students' && (
+        <div className="dm-card overflow-x-auto">
+          <h2 className="dm-section-title p-4 pb-0">Student Status</h2>
+          <table className="dm-table w-full mt-4">
+            <thead><tr><th>Lead ID</th><th>Student</th><th>Class</th><th>Status</th><th>Updated</th></tr></thead>
+            <tbody>
+              {leads.map((l) => (
+                <tr key={l.id} className="cursor-pointer hover:bg-stone-50" onClick={() => openLead(l)}>
+                  <td className="font-mono text-xs">{l.leadId}</td>
+                  <td>{l.studentName}</td>
+                  <td>{l.classGrade || '—'}</td>
+                  <td><StatusBadge status={l.status} /></td>
+                  <td>{formatDate(l.updatedAt || l.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'wallet' && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard label="Total Earnings" value={formatCurrency(dashboard?.stats?.totalEarnings)} />
+          <StatCard label="Pending" value={formatCurrency(commissions.filter((c) => c.status === 'pending').reduce((s, c) => s + c.amount, 0))} />
+          <StatCard label="Paid" value={formatCurrency(commissions.filter((c) => c.status === 'paid').reduce((s, c) => s + c.amount, 0))} />
+        </div>
+      )}
+
+      {tab === 'marketing' && (
+        <div className="grid gap-3 md:grid-cols-2">
+          {MARKETING_KIT.map((m) => (
+            <div key={m.title} className="dm-card p-4 flex justify-between items-center">
+              <span className="font-medium">{m.title}</span>
+              <span className="dm-badge">{m.type}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'training' && (
+        <div className="space-y-3">
+          {TRAINING_RESOURCES.map((t) => (
+            <div key={t.title} className="dm-card p-4 flex justify-between">
+              <span>{t.title}</span>
+              <span className="text-sm text-stone-500">{t.duration}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'support' && (
+        <div className="dm-card p-8 text-center">
+          <h2 className="dm-section-title mb-2">Partner Support</h2>
+          <p className="text-stone-600 mb-4">WhatsApp: 9680102276 · Email: info@dreammantra.in</p>
+          <button type="button" className="dm-btn-primary" onClick={() => setParams({ tab: 'messages' })}>Message Admin</button>
+        </div>
+      )}
+
+      {tab === 'team' && AGENCY_TYPES.includes(user?.partnerType) && (
+        <div className="dm-card p-6">
+          <h2 className="dm-section-title mb-2">Team Members</h2>
+          <p className="text-stone-600">Agency team management — invite sub-partners via Super Admin. Your referral code: <strong>{user?.referralCode}</strong></p>
+        </div>
+      )}
+
+      {tab === 'performance' && AGENCY_TYPES.includes(user?.partnerType) && reports && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StatCard label="Conversion Rate" value={`${reports.conversionRate || 0}%`} />
+          <StatCard label="This Month Leads" value={reports.thisMonthLeads || 0} />
+        </div>
+      )}
+
+      {tab === 'revenue' && AGENCY_TYPES.includes(user?.partnerType) && (
+        <div className="dm-card p-6">
+          <h2 className="dm-section-title">Agency Revenue</h2>
+          <p className="text-3xl font-bold text-gold-dark mt-2">{formatCurrency(dashboard?.stats?.totalEarnings)}</p>
+          <p className="text-sm text-stone-500 mt-1">Total commission earned</p>
+        </div>
+      )}
+
+      <Modal open={leadModal} onClose={() => setLeadModal(false)} title="Add Lead" wide>
+        {phoneCheck && (
+          <div className="dm-alert-warning mb-4 text-sm">
+            Possible duplicate: {phoneCheck.map((d) => `${leadDisplayName(d)} (${d.leadId})`).join(', ')}
+          </div>
+        )}
+        <LeadForm
+          quick
+          form={leadForm}
+          templateFields={leadTemplateFields}
+          onChange={(f) => {
+            setLeadForm(f);
+            const phone = f.leadType === 'business' ? f.contactPhone : f.studentPhone;
+            if (phone) checkPhone(phone);
+          }}
+          onSubmit={handleAddLead}
+          loading={submitting}
+          submitLabel="Submit Lead"
+        />
+      </Modal>
 
       <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Lead ${selectedLead?.leadId}`} wide>
         {selectedLead && (

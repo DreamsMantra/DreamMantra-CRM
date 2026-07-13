@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import * as db from '../lib/db.js';
 import { signToken, authRequired, loadUser } from '../middleware/auth.js';
-import { generateReferralCode, generateLoginId, isValidLoginId, normalizeLoginId, generateFranchiseCode } from '../utils/helpers.js';
+import { generateReferralCode, generateLoginId, isValidLoginId, normalizeLoginId, generateAgencyCode } from '../utils/helpers.js';
 
 const router = Router();
 
@@ -16,7 +16,7 @@ router.get('/forms/:name', (req, res) => {
 router.post('/register', async (req, res) => {
   try {
     const { name, email, phone, password, partnerType, organization, city, state, address,
-      franchiseName, territory, outletCount, investmentTier, operatingModel } = req.body;
+      franchiseName, territory, outletCount, investmentTier, operatingModel, agencyName } = req.body;
     if (!name?.trim() || !email?.trim() || !password || !partnerType) {
       return res.status(400).json({ message: 'Name, email, password and partner type are required' });
     }
@@ -56,16 +56,17 @@ router.post('/register', async (req, res) => {
       address: address?.trim() || '',
       referralCode,
       status: 'pending',
-      ...(partnerType === 'franchise' ? {
-        franchiseName: franchiseName?.trim() || organization?.trim() || name.trim(),
+      ...(partnerType === 'agency' || partnerType === 'franchise' ? {
+        agencyName: (agencyName || franchiseName)?.trim() || organization?.trim() || name.trim(),
         territory: territory?.trim() || city?.trim() || '',
         outletCount: Number(outletCount) || 1,
         investmentTier: investmentTier || 'starter',
         operatingModel: operatingModel || 'single_outlet',
-        franchiseCode: generateFranchiseCode(territory || city || name),
+        agencyCode: generateAgencyCode(territory || city || name),
         royaltyPercent: investmentTier === 'flagship' ? 5 : investmentTier === 'growth' ? 6 : 8,
         commissionRate: 15,
         tier: 'gold',
+        partnerType: 'agency',
       } : {}),
     });
 

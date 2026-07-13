@@ -1,5 +1,8 @@
 import jwt from 'jsonwebtoken';
 import * as db from '../lib/db.js';
+import {
+  isAdminRole, isStaffRole, isSuperAdmin, userHasPermission, getDefaultPermissions,
+} from '../lib/roles.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
@@ -11,6 +14,7 @@ export function signToken(user) {
       role: user.role,
       name: user.name,
       partnerType: user.partnerType,
+      permissions: user.permissions || getDefaultPermissions(user.role),
     },
     JWT_SECRET,
     { expiresIn: '7d' }
@@ -36,14 +40,51 @@ export function loadUser(req, res, next) {
   next();
 }
 
+export function requireRoles(...roles) {
+  return (req, res, next) => {
+    const role = req.auth?.role;
+    if (!roles.includes(role)) {
+      return res.status(403).json({ message: 'Access denied for your role' });
+    }
+    next();
+  };
+}
+
 export function adminOnly(req, res, next) {
-  if (req.auth?.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+  if (!isAdminRole(req.auth?.role)) {
+    return res.status(403).json({ message: 'Admin access required' });
+  }
+  next();
+}
+
+export function superAdminOnly(req, res, next) {
+  if (!isSuperAdmin(req.auth?.role)) {
+    return res.status(403).json({ message: 'Super Admin access required' });
+  }
+  next();
+}
+
+export function staffOnly(req, res, next) {
+  if (!isStaffRole(req.auth?.role)) {
+    return res.status(403).json({ message: 'Staff access required' });
+  }
   next();
 }
 
 export function partnerOnly(req, res, next) {
-  if (req.auth?.role !== 'partner') return res.status(403).json({ message: 'Partner access required' });
+  if (req.auth?.role !== 'partner') {
+    return res.status(403).json({ message: 'Partner access required' });
+  }
   next();
+}
+
+export function requirePermission(permission) {
+  return (req, res, next) => {
+    if (!userHasPermission(req.user, permission)) {
+      return res.status(403).json({ message: `Permission denied: ${permission}` });
+    }
+    next();
+  };
 }
 
 export function activePartnerOnly(req, res, next) {

@@ -1,7 +1,8 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getDashboardPath } from '../config/roleNavigation';
 
-export function ProtectedRoute({ children, role }) {
+export function ProtectedRoute({ children, role, roles }) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -17,8 +18,16 @@ export function ProtectedRoute({ children, role }) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
-  if (role && user.role !== role) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/partner'} replace />;
+  const allowed = roles || (role ? [role] : null);
+  if (allowed) {
+    const adminRoles = ['super_admin', 'admin'];
+    const match = allowed.some((r) => {
+      if (r === 'admin' && adminRoles.includes(user.role)) return true;
+      return user.role === r;
+    });
+    if (!match) {
+      return <Navigate to={getDashboardPath(user.role)} replace />;
+    }
   }
 
   return children;

@@ -1,6 +1,10 @@
 # MongoDB Atlas Setup — Dream Mantra CRM
 
-Your Atlas account: **dreammantra1@gmail.com** · Project **Project 0** · Cluster **Cluster0**
+**Use only:** `dreammantra1@gmail.com` (Dream Mantra Atlas account)
+
+**Do NOT use:** `eshalohiya45@gmail.com`, `lohiyasuppliers@gmail.com`, or any other personal Atlas account for this CRM.
+
+Your Atlas project: **Project 0** · Cluster **Cluster0**
 
 ## Step 1 — Wait for cluster
 

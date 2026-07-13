@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Logo from './Logo';
 
-export default function DashboardLayout({ sidebarLinks, children, title, badge, headerActions }) {
+export default function DashboardLayout({ sidebarLinks, children, title, badge, headerActions, activeTab, onTabChange }) {
   const { user, logout, token } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -21,21 +21,44 @@ export default function DashboardLayout({ sidebarLinks, children, title, badge, 
         <p className="mt-2 text-xs font-medium text-stone-400">{title}</p>
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-        {sidebarLinks.map((link) => (
-          <NavLink
-            key={link.to}
-            to={link.to}
-            end={link.end}
-            onClick={() => setMobileOpen(false)}
-            className={({ isActive }) => `dm-sidebar-link ${isActive ? 'dm-sidebar-link-active' : ''}`}
-          >
-            <link.icon className="h-4 w-4" />
-            {link.label}
-            {link.badge > 0 && (
-              <span className="ml-auto rounded-full bg-orange px-2 py-0.5 text-[10px] font-bold text-white">{link.badge}</span>
-            )}
-          </NavLink>
-        ))}
+        {sidebarLinks.map((link) => {
+          const tabKey = link.tab || 'overview';
+          const isActive = onTabChange ? activeTab === tabKey : undefined;
+          const className = `dm-sidebar-link w-full text-left ${isActive ? 'dm-sidebar-link-active' : ''}`;
+
+          if (onTabChange) {
+            return (
+              <button
+                key={tabKey}
+                type="button"
+                onClick={() => { onTabChange(tabKey); setMobileOpen(false); }}
+                className={className}
+              >
+                <link.icon className="h-4 w-4 shrink-0" />
+                <span className="flex-1">{link.label}</span>
+                {link.badge > 0 && (
+                  <span className="ml-auto rounded-full bg-orange px-2 py-0.5 text-[10px] font-bold text-white">{link.badge}</span>
+                )}
+              </button>
+            );
+          }
+
+          return (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              end={link.end}
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive: navActive }) => `dm-sidebar-link ${navActive ? 'dm-sidebar-link-active' : ''}`}
+            >
+              <link.icon className="h-4 w-4" />
+              {link.label}
+              {link.badge > 0 && (
+                <span className="ml-auto rounded-full bg-orange px-2 py-0.5 text-[10px] font-bold text-white">{link.badge}</span>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
       <div className="border-t border-stone-200 p-4">
         <div className="mb-3 rounded-xl bg-stone-50 p-3">

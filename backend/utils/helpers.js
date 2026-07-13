@@ -9,7 +9,8 @@ const LOGIN_ID_PREFIX = {
   coaching_center: 'CCH',
   influencer: 'INF',
   counsellor: 'CNS',
-  franchise: 'FRN',
+  agency: 'AGY',
+  franchise: 'AGY',
 };
 
 export function generateReferralCode(name = 'DM') {
@@ -30,10 +31,13 @@ export function isValidLoginId(value) {
   return /^[A-Z0-9][A-Z0-9_-]{3,19}$/.test(normalizeLoginId(value));
 }
 
-export function generateFranchiseCode(territory = 'DM') {
+export function generateAgencyCode(territory = 'DM') {
   const prefix = (territory || 'DM').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'DM';
-  return `FRN-${prefix}${nanoid(5).toUpperCase()}`;
+  return `AGY-${prefix}${nanoid(5).toUpperCase()}`;
 }
+
+/** @deprecated */
+export const generateFranchiseCode = generateAgencyCode;
 
 export function generateLeadId() {
   const year = new Date().getFullYear();
@@ -57,7 +61,8 @@ export function partnerTypeLabel(type) {
     coaching_center: 'Coaching Center',
     influencer: 'Influencer',
     counsellor: 'Counsellor',
-    franchise: 'Franchise Partner',
+    agency: 'Agency Partner',
+    franchise: 'Agency Partner',
   };
   return labels[type] || type || 'Partner';
 }

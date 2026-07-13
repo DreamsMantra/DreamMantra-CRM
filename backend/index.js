@@ -8,6 +8,7 @@ import { initDatabase, getDbStatus, getStorageInfo, shutdownDatabase } from './d
 import authRoutes from './routes/auth.js';
 import partnerRoutes from './routes/partner.js';
 import adminRoutes from './routes/admin.js';
+import staffRoutes from './routes/staff.js';
 import messagesRoutes from './routes/messages.js';
 import { UPLOAD_DIR } from './lib/upload.js';
 
@@ -22,7 +23,9 @@ const PORT = process.env.PORT || 5001;
 
 const corsOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
-  : ['http://localhost:5174', 'http://127.0.0.1:5174'];
+  : process.env.NODE_ENV === 'production'
+    ? true
+    : ['http://localhost:5174', 'http://127.0.0.1:5174'];
 
 app.use(cors({ origin: corsOrigins, credentials: true }));
 app.use(express.json({ limit: '5mb' }));
@@ -41,6 +44,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/partner', partnerRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/staff', staffRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/uploads', express.static(UPLOAD_DIR));
 
@@ -56,8 +60,15 @@ async function start() {
   await initDatabase();
   const { mode, mongo } = getStorageInfo();
   console.log(`✓ Database ready (${mode}${mongo !== 'not_configured' ? ` · ${mongo}` : ''})`);
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Cream Mantra CRM API running on http://localhost:${PORT}`);
+  });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n✗ Port ${PORT} is already in use. Stop the other process or set PORT in .env\n`);
+      process.exit(1);
+    }
+    throw err;
   });
 }
 

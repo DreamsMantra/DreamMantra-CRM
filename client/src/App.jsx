@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import PartnerDashboard from './pages/PartnerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import StaffDashboard from './pages/StaffDashboard';
 
 export default function App() {
   return (
@@ -28,8 +29,16 @@ export default function App() {
           <Route
             path="/admin/*"
             element={
-              <ProtectedRoute role="admin">
+              <ProtectedRoute roles={['super_admin', 'admin']}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/*"
+            element={
+              <ProtectedRoute roles={['sales_executive', 'counsellor', 'report_management']}>
+                <StaffDashboard />
               </ProtectedRoute>
             }
           />

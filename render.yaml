@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: DreamMantra-CRM
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: ADMIN_EMAIL
+        value: admin@dreammantra.in
+      - key: CORS_ORIGIN
+        value: https://dreammantra-crm.onrender.com

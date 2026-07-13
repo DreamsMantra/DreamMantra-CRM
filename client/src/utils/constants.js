@@ -19,23 +19,23 @@ export const PARTNER_TYPES = [
   { value: 'coaching_center', label: 'Coaching Center' },
   { value: 'influencer', label: 'Influencer' },
   { value: 'counsellor', label: 'Counsellor' },
-  { value: 'franchise', label: 'Franchise Partner' },
+  { value: 'agency', label: 'Agency Partner' },
 ];
 
-export const FRANCHISE_INVESTMENT_TIERS = [
+export const AGENCY_INVESTMENT_TIERS = [
   { value: 'starter', label: 'Starter (₹5–10L)', royalty: 8, leadTarget: 30 },
   { value: 'growth', label: 'Growth (₹10–25L)', royalty: 6, leadTarget: 60 },
   { value: 'flagship', label: 'Flagship (₹25L+)', royalty: 5, leadTarget: 100 },
 ];
 
-export const FRANCHISE_OPERATING_MODELS = [
-  { value: 'single_outlet', label: 'Single Outlet' },
-  { value: 'multi_outlet', label: 'Multi Outlet' },
-  { value: 'master_franchise', label: 'Master Franchise (City Rights)' },
+export const AGENCY_OPERATING_MODELS = [
+  { value: 'single_outlet', label: 'Single Centre' },
+  { value: 'multi_outlet', label: 'Multi Centre' },
+  { value: 'master_agency', label: 'Master Agency (City Rights)' },
 ];
 
-export const FRANCHISE_ONBOARDING_STEPS = [
-  { key: 'agreementSigned', label: 'Franchise agreement signed' },
+export const AGENCY_ONBOARDING_STEPS = [
+  { key: 'agreementSigned', label: 'Agency agreement signed' },
   { key: 'trainingCompleted', label: 'Counsellor training completed' },
   { key: 'brandingSetup', label: 'Branding & centre setup done' },
   { key: 'firstLeadSubmitted', label: 'First student lead submitted' },
@@ -43,15 +43,33 @@ export const FRANCHISE_ONBOARDING_STEPS = [
   { key: 'launchEventDone', label: 'Launch event / orientation done' },
 ];
 
+/** @deprecated */
+export const FRANCHISE_INVESTMENT_TIERS = AGENCY_INVESTMENT_TIERS;
+export const FRANCHISE_OPERATING_MODELS = AGENCY_OPERATING_MODELS;
+export const FRANCHISE_ONBOARDING_STEPS = AGENCY_ONBOARDING_STEPS;
+
 export const LEAD_STATUSES = [
   { value: 'new', label: 'New', color: 'bg-blue-500/20 text-blue-300' },
   { value: 'contacted', label: 'Contacted', color: 'bg-cyan-500/20 text-cyan-300' },
   { value: 'interested', label: 'Interested', color: 'bg-purple-500/20 text-purple-300' },
+  { value: 'follow_up', label: 'Follow-up', color: 'bg-violet-500/20 text-violet-300' },
+  { value: 'counselling_booked', label: 'Counselling Booked', color: 'bg-indigo-500/20 text-indigo-300' },
   { value: 'counselling_scheduled', label: 'Counselling Scheduled', color: 'bg-indigo-500/20 text-indigo-300' },
-  { value: 'assessment_done', label: 'Assessment Done', color: 'bg-amber-500/20 text-amber-300' },
+  { value: 'payment_pending', label: 'Payment Pending', color: 'bg-amber-500/20 text-amber-300' },
+  { value: 'payment_done', label: 'Payment Done', color: 'bg-yellow-500/20 text-yellow-300' },
+  { value: 'assessment_pending', label: 'Assessment Pending', color: 'bg-orange-500/20 text-orange-300' },
+  { value: 'assessment_done', label: 'Assessment Done', color: 'bg-orange-500/20 text-orange-300' },
+  { value: 'report_under_process', label: 'Report Under Process', color: 'bg-pink-500/20 text-pink-300' },
+  { value: 'report_ready', label: 'Report Ready', color: 'bg-emerald-500/20 text-emerald-300' },
+  { value: 'report_delivered', label: 'Report Delivered', color: 'bg-green-500/20 text-green-300' },
+  { value: 'completed', label: 'Completed', color: 'bg-emerald-500/20 text-emerald-300' },
   { value: 'converted', label: 'Converted', color: 'bg-emerald-500/20 text-emerald-300' },
   { value: 'lost', label: 'Lost', color: 'bg-red-500/20 text-red-300' },
   { value: 'on_hold', label: 'On Hold', color: 'bg-gray-500/20 text-gray-300' },
+];
+
+export const PRODUCT_OPTIONS = [
+  'Brain Mapping', 'Skill Mapping', 'AI Career Launchpad', 'Counselling',
 ];
 
 export const INTEREST_OPTIONS = [
@@ -73,9 +91,12 @@ export const INDIAN_STATES = [
   'Uttarakhand', 'West Bengal', 'Delhi', 'Jammu and Kashmir', 'Ladakh',
 ];
 
-export function franchiseTierMeta(tier) {
-  return FRANCHISE_INVESTMENT_TIERS.find((t) => t.value === tier) || FRANCHISE_INVESTMENT_TIERS[0];
+export function agencyTierMeta(tier) {
+  return AGENCY_INVESTMENT_TIERS.find((t) => t.value === tier) || AGENCY_INVESTMENT_TIERS[0];
 }
+
+/** @deprecated */
+export const franchiseTierMeta = agencyTierMeta;
 
 export function partnerTypeLabel(type) {
   return PARTNER_TYPES.find((p) => p.value === type)?.label || type;
