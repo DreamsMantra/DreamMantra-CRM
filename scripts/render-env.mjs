@@ -8,12 +8,16 @@ const SERVICE_ID = 'srv-d9ad5epkh4rs73b5torg';
 
 const envPath = path.join(__dirname, '../backend/.env');
 const local = {};
-if (fs.existsSync(envPath)) {
-  fs.readFileSync(envPath, 'utf8').split('\n').forEach((line) => {
-    const m = line.match(/^([^#=]+)=(.*)$/);
-    if (m) local[m[1].trim()] = m[2].trim().replace(/\r$/, '');
-  });
-}
+const content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+content.split('\n').forEach((line) => {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#')) return;
+  const eq = trimmed.indexOf('=');
+  if (eq === -1) return;
+  const key = trimmed.slice(0, eq).trim();
+  const value = trimmed.slice(eq + 1).trim();
+  if (key) local[key] = value;
+});
 
 const envVars = [
   { key: 'NODE_ENV', value: 'production' },
