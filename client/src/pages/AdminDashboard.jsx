@@ -73,7 +73,13 @@ export default function AdminDashboard() {
   const [leadPriorityFilter, setLeadPriorityFilter] = useState('all');
   const [leadTypeFilter, setLeadTypeFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [staffUsers, setStaffUsers] = useState([]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearchQuery(search.trim()), 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
   useEffect(() => {
     if (!alias) return;
@@ -117,53 +123,71 @@ export default function AdminDashboard() {
     api.auth.formTemplate('lead').then((r) => setLeadTemplateFields(r.fields || [])).catch(() => {});
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts = {}) => {
     setError('');
     const safe = async (fn, fallback) => {
       try { return await fn(); } catch { return fallback; }
     };
+    const forceAll = !!opts.force;
     try {
-      const leadTypeParam = leadTypeFilter !== 'all' ? leadTypeFilter : undefined;
-      const [dash, partnerData, leadData, commData, fuData, dupData] = await Promise.all([
-        safe(() => api.admin.dashboard(), null),
-        safe(() => api.admin.partners({ status: partnerFilter, partnerType: partnerTypeFilter, search }), { partners: [] }),
-        safe(() => api.admin.leads({ status: leadFilter, partnerId: leadPartnerFilter, priority: leadPriorityFilter, search, leadType: leadTypeParam }), { leads: [] }),
-        safe(() => api.admin.commissions(), { commissions: [] }),
-        safe(() => api.admin.followUps(), { overdue: [], upcoming: [], today: [] }),
-        safe(() => api.admin.duplicates(), { groups: [] }),
-      ]);
-      if (dash) setDashboard(dash);
-      setPartners(partnerData.partners || []);
-      setLeads(leadData.leads || []);
-      setCommissions(commData.commissions || []);
-      setFollowUps(fuData);
-      setDuplicates(dupData.groups || []);
+      const tasks = [];
 
-      if (tab === 'reports' || tab === 'overview') {
-        const r = await safe(() => api.admin.reports(), null);
-        if (r) setReports(r);
+      // Always keep dashboard badges fresh on main work tabs
+      if (forceAll || ['overview', 'leads', 'partners', 'students', 'finance', 'reports'].includes(tab)) {
+        tasks.push(safe(() => api.admin.dashboard(), null).then((d) => { if (d) setDashboard(d); }));
+        tasks.push(safe(() => api.admin.followUps(), { overdue: [], upcoming: [], today: [] }).then(setFollowUps));
       }
-      if (tab === 'overview') {
-        const a = await safe(() => api.admin.activity(), { activities: [] });
-        setActivities(a.activities || []);
+
+      if (forceAll || ['overview', 'partners', 'leads', 'finance', 'team', 'settings', 'students'].includes(tab)) {
+        const pStatus = tab === 'partners' ? partnerFilter : (forceAll ? partnerFilter : 'all');
+        const pType = tab === 'partners' ? partnerTypeFilter : 'all';
+        const pSearch = tab === 'partners' ? searchQuery : undefined;
+        tasks.push(safe(() => api.admin.partners({ status: pStatus, partnerType: pType, search: pSearch }), { partners: [] })
+          .then((d) => setPartners(d.partners || [])));
       }
-      if (tab === 'settings') {
-        const sys = await safe(() => api.admin.system(), { settings: {}, stats: {} });
-        setSettings(sys.settings || {});
+
+      if (forceAll || ['overview', 'leads', 'students', 'team', 'finance'].includes(tab)) {
+        const leadTypeParam = tab === 'leads' && leadTypeFilter !== 'all' ? leadTypeFilter : undefined;
+        tasks.push(safe(() => api.admin.leads({
+          status: tab === 'leads' ? leadFilter : 'all',
+          partnerId: tab === 'leads' ? leadPartnerFilter : 'all',
+          priority: tab === 'leads' ? leadPriorityFilter : 'all',
+          search: tab === 'leads' ? searchQuery : undefined,
+          leadType: leadTypeParam,
+        }), { leads: [] }).then((d) => setLeads(d.leads || [])));
       }
-      if (user?.role === 'super_admin' && (tab === 'overview' || tab === 'team' || tab === 'students')) {
-        const u = await safe(() => api.admin.users(), { users: [] });
-        setStaffUsers(u.users || []);
-        if (tab === 'overview') {
-          const ent = await safe(() => api.admin.enterprise(), { stats: null });
-          if (ent?.stats) setEnterprise(ent.stats);
+
+      if (forceAll || tab === 'leads') {
+        tasks.push(safe(() => api.admin.duplicates(), { groups: [] }).then((d) => setDuplicates(d.groups || [])));
+      }
+
+      if (forceAll || tab === 'finance') {
+        tasks.push(safe(() => api.admin.commissions(), { commissions: [] }).then((d) => setCommissions(d.commissions || [])));
+      }
+
+      if (forceAll || tab === 'reports' || tab === 'overview') {
+        tasks.push(safe(() => api.admin.reports(), null).then((r) => { if (r) setReports(r); }));
+      }
+      if (forceAll || tab === 'overview') {
+        tasks.push(safe(() => api.admin.activity(), { activities: [] }).then((a) => setActivities(a.activities || [])));
+      }
+      if (forceAll || tab === 'settings') {
+        tasks.push(safe(() => api.admin.system(), { settings: {}, stats: {} }).then((sys) => setSettings(sys.settings || {})));
+      }
+      if (user?.role === 'super_admin' && (forceAll || tab === 'overview' || tab === 'team' || tab === 'students')) {
+        tasks.push(safe(() => api.admin.users(), { users: [] }).then((u) => setStaffUsers(u.users || [])));
+        if (forceAll || tab === 'overview') {
+          tasks.push(safe(() => api.admin.enterprise(), { stats: null }).then((ent) => { if (ent?.stats) setEnterprise(ent.stats); }));
         }
       }
+
+      await Promise.all(tasks);
     } catch (err) { fail(err); }
-  }, [tab, sub, innerSub, partnerFilter, partnerTypeFilter, leadFilter, leadPartnerFilter, leadPriorityFilter, leadTypeFilter, search, user?.role]);
+  }, [tab, partnerFilter, partnerTypeFilter, leadFilter, leadPartnerFilter, leadPriorityFilter, leadTypeFilter, searchQuery, user?.role]);
 
   useEffect(() => { load(); }, [load]);
 
+  const refresh = useCallback(() => load({ force: true }), [load]);
   const openLeadDetail = async (lead) => {
     setSelectedLead(lead);
     setLeadUpdate({
@@ -206,14 +230,14 @@ export default function AdminDashboard() {
     await api.admin.updatePartner(id, form);
     flash('Partner updated');
     setViewPartner(null);
-    load();
+    refresh();
   };
 
   const deletePartner = async (p) => {
     if (!confirm(`Delete partner "${p.name}"? Their leads will remain but partner account is removed.`)) return;
     await api.admin.deletePartner(p.id);
     flash('Partner deleted');
-    load();
+    refresh();
   };
 
   const resetPassword = async (p) => {
@@ -234,7 +258,7 @@ export default function AdminDashboard() {
     await api.admin.bulkLeadAction({ ids: selectedLeads, status });
     flash(`${selectedLeads.length} leads updated`);
     setSelectedLeads([]);
-    load();
+    refresh();
   };
 
   const deleteLead = async (lead) => {
@@ -242,7 +266,7 @@ export default function AdminDashboard() {
     await api.admin.deleteLead(lead.id || lead._id);
     flash('Lead deleted');
     setSelectedLead(null);
-    load();
+    refresh();
   };
 
   const openPartnerCreate = (asAgency = false) => {
@@ -294,7 +318,7 @@ export default function AdminDashboard() {
     search, setSearch, partnerFilter, setPartnerFilter, partnerTypeFilter, setPartnerTypeFilter,
     selectedPartners, setSelectedPartners, selectedLeads, setSelectedLeads, selectedCommissions, setSelectedCommissions,
     settings, setSettings, notifyForm, setNotifyForm, bulkImportPartner, setBulkImportPartner,
-    load, flash, fail, toggleAll, bulkLeads, setTab, setSub, setInner,
+    load: refresh, flash, fail, toggleAll, bulkLeads, setTab, setSub, setInner,
     onQuickLead: openQuickLead, onPartnerCreate: openPartnerCreate, onOpenLead: openLeadDetail,
     openLeadDetail, viewPartnerDetail, deletePartner, resetPassword,
     setEditingPartner, setPartnerForm, setPartnerModal, setCommissionModal, setEditCommission,
@@ -344,7 +368,7 @@ export default function AdminDashboard() {
         viewPartner={viewPartner} setViewPartner={setViewPartner} partnerDetail={partnerDetail} setPartnerDetail={setPartnerDetail}
         savePartnerFromDetail={savePartnerFromDetail} credentialsData={credentialsData} setCredentialsData={setCredentialsData}
         partnerModal={partnerModal} setPartnerModal={setPartnerModal} editingPartner={editingPartner}
-        partnerForm={partnerForm} setPartnerForm={setPartnerForm} flash={flash} fail={fail} load={load}
+        partnerForm={partnerForm} setPartnerForm={setPartnerForm} flash={flash} fail={fail} load={refresh}
         selectedLead={selectedLead} setSelectedLead={setSelectedLead} leadUpdate={leadUpdate} setLeadUpdate={setLeadUpdate}
         leadEditForm={leadEditForm} setLeadEditForm={setLeadEditForm} leadTemplateFields={leadTemplateFields}
         transferPartnerId={transferPartnerId} setTransferPartnerId={setTransferPartnerId} partners={partners}

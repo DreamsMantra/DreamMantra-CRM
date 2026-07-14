@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -27,6 +28,7 @@ const corsOrigins = process.env.CORS_ORIGIN
     ? true
     : ['http://localhost:5174', 'http://127.0.0.1:5174'];
 
+app.use(compression({ threshold: 1024 }));
 app.use(cors({ origin: corsOrigins, credentials: true }));
 app.use(express.json({ limit: '5mb' }));
 
@@ -46,12 +48,18 @@ app.use('/api/partner', partnerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/messages', messagesRoutes);
-app.use('/api/uploads', express.static(UPLOAD_DIR));
+app.use('/api/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', etag: true }));
 
 if (hasBuiltClient) {
-  app.use(express.static(clientDist, { maxAge: '1d' }));
+  app.use('/assets', express.static(path.join(clientDist, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+    etag: true,
+  }));
+  app.use(express.static(clientDist, { maxAge: '1h', etag: true, index: false }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }

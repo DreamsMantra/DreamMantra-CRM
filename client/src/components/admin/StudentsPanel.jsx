@@ -5,16 +5,28 @@ import Modal from '../Modal';
 import AdminPageHeader, { EditButton } from './AdminPageHeader';
 import { LEAD_STATUSES } from '../../utils/constants';
 
-export default function StudentsPanel({ assignMode = false, staffUsers = [], onEditLead, embedded = false }) {
+export default function StudentsPanel({
+  assignMode = false,
+  staffUsers = [],
+  onEditLead,
+  embedded = false,
+  apiMode = 'admin',
+}) {
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState('');
   const [editModal, setEditModal] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
 
-  const load = () => api.admin.students().then((r) => setStudents(r.students || []));
+  const load = () => {
+    const fetcher = apiMode === 'staff' ? api.staff.students : api.admin.students;
+    return fetcher()
+      .then((r) => setStudents(r.students || []))
+      .catch((e) => setError(e.message || 'Failed to load students'));
+  };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [apiMode]);
 
   const filtered = students.filter((s) => {
     if (!search) return true;
@@ -23,7 +35,7 @@ export default function StudentsPanel({ assignMode = false, staffUsers = [], onE
   });
 
   const openEdit = (s) => {
-    if (onEditLead) { onEditLead({ id: s.id, ...s }); return; }
+    if (onEditLead && apiMode === 'admin') { onEditLead({ id: s.id, ...s }); return; }
     setEditForm({
       id: s.id,
       studentName: s.studentName || '',
@@ -34,35 +46,58 @@ export default function StudentsPanel({ assignMode = false, staffUsers = [], onE
       status: s.status || 'new',
       assignedSalesId: s.assignedSalesId || '',
       assignedCounsellorId: s.assignedCounsellorId || '',
+      notes: s.notes || '',
+      followUpDate: s.followUpDate?.slice?.(0, 10) || '',
+      priority: s.priority || 'medium',
     });
     setEditModal(true);
   };
 
   const saveEdit = async (e) => {
     e.preventDefault();
-    const { id, ...body } = editForm;
-    await api.admin.editLead(id, {
-      studentName: body.studentName,
-      parentName: body.parentName,
-      studentPhone: body.mobile,
-      classGrade: body.classGrade,
-      schoolCollege: body.school,
-    });
-    await api.admin.updateLead(id, {
-      assignedSalesId: body.assignedSalesId || undefined,
-      assignedCounsellorId: body.assignedCounsellorId || undefined,
-      status: body.status,
-    });
-    setMsg('Student updated');
-    setEditModal(false);
-    load();
-    setTimeout(() => setMsg(''), 3000);
+    setError('');
+    try {
+      const { id, ...body } = editForm;
+      if (apiMode === 'staff') {
+        await api.staff.updateLead(id, {
+          studentName: body.studentName,
+          parentName: body.parentName,
+          studentPhone: body.mobile,
+          classGrade: body.classGrade,
+          schoolCollege: body.school,
+          status: body.status,
+          notes: body.notes,
+          followUpDate: body.followUpDate || undefined,
+          priority: body.priority,
+        });
+      } else {
+        await api.admin.editLead(id, {
+          studentName: body.studentName,
+          parentName: body.parentName,
+          studentPhone: body.mobile,
+          classGrade: body.classGrade,
+          schoolCollege: body.school,
+        });
+        await api.admin.updateLead(id, {
+          assignedSalesId: body.assignedSalesId || undefined,
+          assignedCounsellorId: body.assignedCounsellorId || undefined,
+          status: body.status,
+        });
+      }
+      setMsg('Student updated');
+      setEditModal(false);
+      load();
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) {
+      setError(err.message || 'Update failed');
+    }
   };
 
   return (
     <div className="space-y-4">
       {!embedded && <AdminPageHeader title="Students" subtitle={`${students.length} students in pipeline`} onRefresh={load} />}
       {msg && <p className="text-sm text-emerald-600">{msg}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
       <input className="dm-input max-w-md" placeholder="Search name, mobile, lead ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
 
       <div className="dm-card overflow-x-auto">
@@ -108,24 +143,37 @@ export default function StudentsPanel({ assignMode = false, staffUsers = [], onE
 
       <Modal open={editModal} onClose={() => setEditModal(false)} title="Update Student">
         <form onSubmit={saveEdit} className="space-y-3">
-          <input className="dm-input" placeholder="Student name" value={editForm.studentName} onChange={(e) => setEditForm({ ...editForm, studentName: e.target.value })} required />
-          <input className="dm-input" placeholder="Parent name" value={editForm.parentName} onChange={(e) => setEditForm({ ...editForm, parentName: e.target.value })} />
-          <input className="dm-input" placeholder="Mobile" value={editForm.mobile} onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })} />
+          <input className="dm-input" placeholder="Student name" value={editForm.studentName || ''} onChange={(e) => setEditForm({ ...editForm, studentName: e.target.value })} required />
+          <input className="dm-input" placeholder="Parent name" value={editForm.parentName || ''} onChange={(e) => setEditForm({ ...editForm, parentName: e.target.value })} />
+          <input className="dm-input" placeholder="Mobile" value={editForm.mobile || ''} onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })} />
           <div className="grid grid-cols-2 gap-3">
-            <input className="dm-input" placeholder="Class" value={editForm.classGrade} onChange={(e) => setEditForm({ ...editForm, classGrade: e.target.value })} />
-            <input className="dm-input" placeholder="School" value={editForm.school} onChange={(e) => setEditForm({ ...editForm, school: e.target.value })} />
+            <input className="dm-input" placeholder="Class" value={editForm.classGrade || ''} onChange={(e) => setEditForm({ ...editForm, classGrade: e.target.value })} />
+            <input className="dm-input" placeholder="School" value={editForm.school || ''} onChange={(e) => setEditForm({ ...editForm, school: e.target.value })} />
           </div>
-          <select className="dm-input" value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
+          <select className="dm-input" value={editForm.status || 'new'} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
             {LEAD_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
-          <select className="dm-input" value={editForm.assignedSalesId} onChange={(e) => setEditForm({ ...editForm, assignedSalesId: e.target.value })}>
-            <option value="">Sales — Unassigned</option>
-            {staffUsers.filter((u) => u.role === 'sales_executive').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
-          <select className="dm-input" value={editForm.assignedCounsellorId} onChange={(e) => setEditForm({ ...editForm, assignedCounsellorId: e.target.value })}>
-            <option value="">Counsellor — Unassigned</option>
-            {staffUsers.filter((u) => u.role === 'counsellor').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
+          {apiMode === 'staff' && (
+            <>
+              <input type="date" className="dm-input" value={editForm.followUpDate || ''} onChange={(e) => setEditForm({ ...editForm, followUpDate: e.target.value })} />
+              <select className="dm-input" value={editForm.priority || 'medium'} onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}>
+                {['low', 'medium', 'high'].map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <textarea className="dm-input" placeholder="Notes" value={editForm.notes || ''} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+            </>
+          )}
+          {apiMode === 'admin' && (
+            <>
+              <select className="dm-input" value={editForm.assignedSalesId || ''} onChange={(e) => setEditForm({ ...editForm, assignedSalesId: e.target.value })}>
+                <option value="">Sales — Unassigned</option>
+                {staffUsers.filter((u) => u.role === 'sales_executive').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+              <select className="dm-input" value={editForm.assignedCounsellorId || ''} onChange={(e) => setEditForm({ ...editForm, assignedCounsellorId: e.target.value })}>
+                <option value="">Counsellor — Unassigned</option>
+                {staffUsers.filter((u) => u.role === 'counsellor').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </>
+          )}
           <button type="submit" className="dm-btn-primary w-full">Save Changes</button>
         </form>
       </Modal>

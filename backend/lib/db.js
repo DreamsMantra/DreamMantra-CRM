@@ -630,8 +630,16 @@ export function getFollowUps(filter = {}) {
   today.setHours(0, 0, 0, 0);
   const weekLater = new Date(today);
   weekLater.setDate(weekLater.getDate() + 7);
+  const todayStr = today.toDateString();
 
-  let leads = loadStore().leads.filter((l) => l.followUpDate && !['converted', 'lost'].includes(l.status));
+  let leads = loadStore().leads.filter((l) => l.followUpDate && !['converted', 'lost', 'completed'].includes(l.status));
+  if (filter.partnerId) leads = leads.filter((l) => l.partnerId === filter.partnerId);
+  if (filter.assignedSalesId) {
+    leads = leads.filter((l) => l.assignedSalesId === filter.assignedSalesId || l.assignedTo === filter.assignedSalesId);
+  }
+  if (filter.assignedCounsellorId) {
+    leads = leads.filter((l) => l.assignedCounsellorId === filter.assignedCounsellorId);
+  }
   if (filter.overdue) {
     leads = leads.filter((l) => new Date(l.followUpDate) < today);
   } else if (filter.upcoming) {
@@ -639,9 +647,44 @@ export function getFollowUps(filter = {}) {
       const d = new Date(l.followUpDate);
       return d >= today && d <= weekLater;
     });
+  } else if (filter.today) {
+    leads = leads.filter((l) => new Date(l.followUpDate).toDateString() === todayStr);
   }
-  if (filter.partnerId) leads = leads.filter((l) => l.partnerId === filter.partnerId);
   return sortByDate(leads.map((l) => ({ ...populateLead(l), followUpDate: l.followUpDate })), 'followUpDate', false);
+}
+
+/** Single pass buckets — avoids rescanning leads 3x */
+export function getFollowUpBuckets(filter = {}) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekLater = new Date(today);
+  weekLater.setDate(weekLater.getDate() + 7);
+  const todayStr = today.toDateString();
+
+  let leads = loadStore().leads.filter((l) => l.followUpDate && !['converted', 'lost', 'completed'].includes(l.status));
+  if (filter.partnerId) leads = leads.filter((l) => l.partnerId === filter.partnerId);
+  if (filter.assignedSalesId) {
+    leads = leads.filter((l) => l.assignedSalesId === filter.assignedSalesId || l.assignedTo === filter.assignedSalesId);
+  }
+  if (filter.assignedCounsellorId) {
+    leads = leads.filter((l) => l.assignedCounsellorId === filter.assignedCounsellorId);
+  }
+
+  const overdue = [];
+  const upcoming = [];
+  const todayList = [];
+  for (const l of leads) {
+    const d = new Date(l.followUpDate);
+    const row = { ...populateLead(l), followUpDate: l.followUpDate };
+    if (d < today) overdue.push(row);
+    else if (d.toDateString() === todayStr) todayList.push(row);
+    if (d >= today && d <= weekLater) upcoming.push(row);
+  }
+  return {
+    overdue: sortByDate(overdue, 'followUpDate', false),
+    upcoming: sortByDate(upcoming, 'followUpDate', false),
+    today: sortByDate(todayList, 'followUpDate', false),
+  };
 }
 
 export function findDuplicateLeads(phone, excludeId = null) {

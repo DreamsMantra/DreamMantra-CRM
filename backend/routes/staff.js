@@ -6,6 +6,24 @@ const router = Router();
 router.use(authRequired, loadUser);
 router.use(requireRoles('sales_executive', 'counsellor', 'report_management'));
 
+function leadScopeFilter(user) {
+  if (user.role === 'sales_executive') return { assignedSalesId: user.id };
+  if (user.role === 'counsellor') return { assignedCounsellorId: user.id };
+  return {};
+}
+
+function canAccessLead(user, lead) {
+  if (!lead) return false;
+  if (user.role === 'report_management') return true;
+  if (user.role === 'sales_executive') {
+    return lead.assignedSalesId === user.id || lead.assignedTo === user.id;
+  }
+  if (user.role === 'counsellor') {
+    return lead.assignedCounsellorId === user.id || lead.assignedTo === user.id;
+  }
+  return false;
+}
+
 router.get('/dashboard', (req, res) => {
   res.json(db.getStaffDashboard(req.user));
 });
@@ -15,6 +33,12 @@ router.get('/leads', (req, res) => {
   if (req.user.role === 'sales_executive') {
     const leads = db.getLeads(filter).filter(
       (l) => l.assignedSalesId === req.user.id || l.assignedTo === req.user.id
+    );
+    return res.json({ leads: leads.map((l) => db.populateLead(l)) });
+  }
+  if (req.user.role === 'counsellor') {
+    const leads = db.getLeads(filter).filter(
+      (l) => l.assignedCounsellorId === req.user.id || l.assignedTo === req.user.id
     );
     return res.json({ leads: leads.map((l) => db.populateLead(l)) });
   }
@@ -79,22 +103,30 @@ router.post('/calls', (req, res) => {
   res.status(201).json({ call: log });
 });
 
-router.get('/follow-ups', (_req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
-  const all = db.getFollowUps();
-  res.json({
-    overdue: all.filter((l) => l.followUpDate < today),
-    upcoming: all.filter((l) => l.followUpDate >= today),
-    today: all.filter((l) => l.followUpDate === today),
-  });
+router.get('/follow-ups', (req, res) => {
+  res.json(db.getFollowUpBuckets(leadScopeFilter(req.user)));
 });
 
 router.patch('/leads/:id', async (req, res) => {
   const lead = db.findLead(req.params.id);
-  if (!lead) return res.status(404).json({ message: 'Lead not found' });
-  const allowed = ['status', 'notes', 'adminNotes', 'followUpDate', 'priority', 'assignedSalesId', 'assignedCounsellorId'];
+  if (!canAccessLead(req.user, lead)) {
+    return res.status(404).json({ message: 'Lead not found' });
+  }
+  const allowed = [
+    'status', 'notes', 'adminNotes', 'followUpDate', 'priority',
+    'assignedSalesId', 'assignedCounsellorId', 'assignedTo',
+    'studentName', 'studentPhone', 'studentEmail', 'parentName', 'parentPhone',
+    'classGrade', 'stream', 'schoolCollege', 'city', 'state',
+    'companyName', 'contactPerson', 'contactPhone', 'contactEmail',
+    'businessType', 'estimatedStudents', 'dealValue', 'interestedIn',
+    'expectedValue', 'tags',
+  ];
   const updates = {};
   allowed.forEach((f) => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
+  if (req.body.note && updates.status) {
+    // status note handled via statusHistory if updateLead supports it — keep in adminNotes merge
+    updates.adminNotes = [lead.adminNotes, req.body.note].filter(Boolean).join('\n');
+  }
   const updated = db.updateLead(req.params.id, updates);
   db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'lead_updated', entityType: 'lead', entityId: lead.id });
   res.json({ lead: db.populateLead(updated) });

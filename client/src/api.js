@@ -34,6 +34,7 @@ export const api = {
     dashboard: () => request('/partner/dashboard'),
     leads: (params = {}) => request(`/partner/leads?${new URLSearchParams(params)}`),
     createLead: (body) => request('/partner/leads', { method: 'POST', body: JSON.stringify(body) }),
+    updateLead: (id, body) => request(`/partner/leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     getLead: (id) => request(`/partner/leads/${id}`),
     checkDuplicate: (phone) => request('/partner/leads/check-duplicate', { method: 'POST', body: JSON.stringify({ phone }) }),
     bulkLeads: (leads) => request('/partner/leads/bulk', { method: 'POST', body: JSON.stringify({ leads }) }),

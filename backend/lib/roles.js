@@ -72,7 +72,7 @@ export const DEFAULT_PERMISSIONS = {
     'assessments.view', 'assessments.edit',
   ],
   partner: [
-    'dashboard.view', 'leads.view', 'leads.create', 'commissions.view', 'payout.request',
+    'dashboard.view', 'leads.view', 'leads.create', 'leads.edit', 'commissions.view', 'payout.request',
   ],
 };
 

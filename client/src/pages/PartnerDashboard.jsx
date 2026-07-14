@@ -64,6 +64,7 @@ export default function PartnerDashboard() {
   const [error, setError] = useState('');
   const [selectedLead, setSelectedLead] = useState(null);
   const [leadComments, setLeadComments] = useState([]);
+  const [partnerEditForm, setPartnerEditForm] = useState(null);
   const [leadFilter, setLeadFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [copied, setCopied] = useState(false);
@@ -93,9 +94,10 @@ export default function PartnerDashboard() {
     setLoading(true);
     setError('');
     try {
+      const safe = async (fn, fallback) => { try { return await fn(); } catch { return fallback; } };
       const [notifData, annData] = await Promise.all([
-        api.partner.notifications(),
-        api.partner.announcements(),
+        safe(() => api.partner.notifications(), { notifications: [], unread: 0 }),
+        safe(() => api.partner.announcements(), { announcements: [] }),
       ]);
       setNotifications(notifData);
       setAnnouncements(annData.announcements || []);
@@ -105,14 +107,23 @@ export default function PartnerDashboard() {
         return;
       }
 
-      const tasks = [
-        api.partner.dashboard().then(setDashboard),
-        api.partner.leads({ status: leadFilter, search }).then((d) => setLeads(d.leads)),
-        api.partner.commissions().then((d) => setCommissions(d.commissions)),
-        api.partner.followUps().then(setFollowUps),
-      ];
-      if (tab === 'reports' || tab === 'overview') tasks.push(api.partner.reports().then(setReports));
-      if (tab === 'leaderboard' || tab === 'overview') tasks.push(api.partner.leaderboard().then(setLeaderboard));
+      const tasks = [];
+      if (['overview', 'leads', 'follow-ups', 'money', 'reports', 'leaderboard', 'students', 'performance', 'revenue'].includes(tab)) {
+        tasks.push(api.partner.dashboard().then(setDashboard));
+        tasks.push(api.partner.followUps().then(setFollowUps));
+      }
+      if (['overview', 'leads', 'students', 'follow-ups'].includes(tab)) {
+        tasks.push(api.partner.leads({ status: leadFilter, search }).then((d) => setLeads(d.leads)));
+      }
+      if (['overview', 'money', 'revenue'].includes(tab)) {
+        tasks.push(api.partner.commissions().then((d) => setCommissions(d.commissions)));
+      }
+      if (tab === 'reports' || tab === 'overview' || tab === 'performance') {
+        tasks.push(api.partner.reports().then(setReports));
+      }
+      if (tab === 'leaderboard' || tab === 'overview') {
+        tasks.push(api.partner.leaderboard().then(setLeaderboard));
+      }
       await Promise.all(tasks);
     } catch (err) {
       setError(err.message);
@@ -132,6 +143,22 @@ export default function PartnerDashboard() {
 
   const openLead = async (lead) => {
     setSelectedLead(lead);
+    setPartnerEditForm({
+      studentName: lead.studentName || '',
+      studentPhone: lead.studentPhone || '',
+      studentEmail: lead.studentEmail || '',
+      parentName: lead.parentName || '',
+      parentPhone: lead.parentPhone || '',
+      classGrade: lead.classGrade || '',
+      schoolCollege: lead.schoolCollege || '',
+      city: lead.city || '',
+      notes: lead.notes || '',
+      priority: lead.priority || 'medium',
+      companyName: lead.companyName || '',
+      contactPerson: lead.contactPerson || '',
+      contactPhone: lead.contactPhone || '',
+      contactEmail: lead.contactEmail || '',
+    });
     try {
       const { comments } = await api.partner.leadComments(lead.id || lead._id);
       setLeadComments(comments);
@@ -630,20 +657,48 @@ export default function PartnerDashboard() {
       <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Lead ${selectedLead?.leadId}`} wide>
         {selectedLead && (
           <div className="space-y-5">
-            <div className="grid gap-4 sm:grid-cols-3">
-              {[
-                ['Student', selectedLead.studentName], ['Phone', selectedLead.studentPhone],
-                ['Email', selectedLead.studentEmail || '—'], ['Class', selectedLead.classGrade || '—'],
-                ['City', selectedLead.city || '—'], ['Budget', selectedLead.budget || '—'],
-              ].map(([k, v]) => (
-                <div key={k}><p className="text-xs text-stone-400">{k}</p><p className="font-medium text-stone-800">{v}</p></div>
-              ))}
-              <div><p className="text-xs text-stone-400">Status</p><StatusBadge status={selectedLead.status} /></div>
+            <div className="flex items-center justify-between">
+              <StatusBadge status={selectedLead.status} />
+              <p className="text-xs text-stone-500">Partner ID: {user?.loginId}</p>
             </div>
-            {selectedLead.interestedIn?.length > 0 && (
-              <div className="flex flex-wrap gap-2">{selectedLead.interestedIn.map((i) => <span key={i} className="dm-badge bg-orange/10 text-orange">{i}</span>)}</div>
-            )}
             {selectedLead.adminNotes && <div className="rounded-xl bg-amber-50 p-4"><p className="text-xs font-semibold text-gold-dark">Admin Update</p><p className="mt-1 text-sm text-stone-700">{selectedLead.adminNotes}</p></div>}
+
+            {!['converted', 'lost', 'completed'].includes(selectedLead.status) && partnerEditForm && (
+              <form
+                className="space-y-3 rounded-xl border border-stone-200 p-4"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    await api.partner.updateLead(selectedLead.id || selectedLead._id, partnerEditForm);
+                    setMessage('Lead details updated');
+                    setSelectedLead(null);
+                    load();
+                  } catch (err) { setError(err.message); }
+                }}
+              >
+                <p className="font-semibold text-stone-800">Update Lead Details</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {Object.entries({
+                    studentName: 'Name', studentPhone: 'Phone', studentEmail: 'Email',
+                    parentName: 'Parent', classGrade: 'Class', schoolCollege: 'School / College',
+                    city: 'City', notes: 'Notes',
+                  }).map(([key, label]) => (
+                    <div key={key}>
+                      <label className="dm-label">{label}</label>
+                      <input className="dm-input" value={partnerEditForm[key] || ''} onChange={(e) => setPartnerEditForm({ ...partnerEditForm, [key]: e.target.value })} />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="dm-label">Priority</label>
+                    <select className="dm-input" value={partnerEditForm.priority} onChange={(e) => setPartnerEditForm({ ...partnerEditForm, priority: e.target.value })}>
+                      {['low', 'medium', 'high'].map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <button type="submit" className="dm-btn-primary">Save Updates</button>
+              </form>
+            )}
+
             {selectedLead.statusHistory?.length > 0 && (
               <div>
                 <p className="mb-3 font-semibold text-stone-900">Status Timeline</p>

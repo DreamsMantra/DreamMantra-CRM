@@ -147,6 +147,32 @@ router.get('/leads/:id', activePartnerOnly, (req, res) => {
   res.json({ lead: { ...lead, _id: lead.id } });
 });
 
+router.patch('/leads/:id', activePartnerOnly, (req, res) => {
+  const lead = db.findLead(req.params.id);
+  if (!lead || lead.partnerId !== req.user.id) return res.status(404).json({ message: 'Lead not found' });
+  if (['converted', 'lost', 'completed'].includes(lead.status)) {
+    return res.status(400).json({ message: 'Cannot edit a closed lead. Contact admin.' });
+  }
+
+  const allowed = [
+    'studentName', 'studentPhone', 'studentEmail', 'parentName', 'parentPhone',
+    'classGrade', 'stream', 'schoolCollege', 'city', 'state', 'pincode',
+    'companyName', 'contactPerson', 'contactPhone', 'contactEmail', 'businessType',
+    'estimatedStudents', 'dealValue', 'notes', 'priority', 'interestedIn',
+    'gender', 'dateOfBirth', 'budget', 'preferredContactTime', 'whatsappOptIn',
+  ];
+  const updates = {};
+  allowed.forEach((f) => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
+  if (!Object.keys(updates).length) return res.status(400).json({ message: 'No updatable fields provided' });
+
+  const updated = db.updateLead(req.params.id, updates);
+  db.logActivity({
+    userId: req.user.id, userName: req.user.name, action: 'lead_updated',
+    entityType: 'lead', entityId: lead.id, details: 'Partner updated lead details',
+  });
+  res.json({ lead: { ...updated, _id: updated.id }, message: 'Lead updated' });
+});
+
 router.get('/commissions', activePartnerOnly, (req, res) => {
   const commissions = db.getCommissions({ partnerId: req.user.id }).map(db.populateCommission);
   res.json({ commissions });

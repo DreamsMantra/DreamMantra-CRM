@@ -62,10 +62,10 @@ router.get('/dashboard', (req, res) => {
     recentLeads,
     topPartners,
     monthlyTrends: db.getMonthlyTrends(6),
-    followUpCounts: {
-      overdue: db.getFollowUps({ overdue: true }).length,
-      upcoming: db.getFollowUps({ upcoming: true }).length,
-    },
+    followUpCounts: (() => {
+      const buckets = db.getFollowUpBuckets();
+      return { overdue: buckets.overdue.length, upcoming: buckets.upcoming.length, today: buckets.today.length };
+    })(),
     recentActivity: db.getActivities(10),
   });
 });
@@ -552,16 +552,8 @@ router.get('/activity', (req, res) => {
   res.json({ activities: db.getActivities(Number(req.query.limit) || 50) });
 });
 
-router.get('/follow-ups', (req, res) => {
-  res.json({
-    overdue: db.getFollowUps({ overdue: true }),
-    upcoming: db.getFollowUps({ upcoming: true }),
-    today: db.getFollowUps({}).filter((l) => {
-      const d = new Date(l.followUpDate);
-      const t = new Date();
-      return d.toDateString() === t.toDateString();
-    }),
-  });
+router.get('/follow-ups', (_req, res) => {
+  res.json(db.getFollowUpBuckets());
 });
 
 router.get('/announcements', (_req, res) => {
