@@ -13,11 +13,21 @@ export default function FollowUpList({ overdue = [], upcoming = [], onSelect }) 
           {overdue.length === 0 && <p className="text-sm text-stone-400">No overdue follow-ups</p>}
           {overdue.map((l) => (
             <button key={l.id} type="button" onClick={() => onSelect?.(l)} className="w-full rounded-xl border border-red-100 bg-red-50/50 p-3 text-left transition hover:border-red-200">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="font-semibold text-stone-900">{l.studentName}</span>
-                <StatusBadge status={l.status} />
+                {l.kind === 'activity' ? (
+                  <span className="dm-badge text-[10px] capitalize">{l.type || 'activity'}</span>
+                ) : (
+                  <StatusBadge status={l.status} />
+                )}
               </div>
-              <p className="mt-1 text-xs text-stone-500">{l.leadId} · Due {formatDate(l.followUpDate)}</p>
+              <p className="mt-1 text-xs text-stone-500">
+                {l.kind === 'activity' ? `Activity · ${l.createdByName || 'Staff'}` : l.leadId}
+                {' · '}Due {formatDate(l.followUpDate)}
+              </p>
+              {l.kind === 'activity' && l.comment && (
+                <p className="mt-1 line-clamp-2 text-xs text-stone-600">{l.comment}</p>
+              )}
             </button>
           ))}
         </div>
@@ -30,13 +40,21 @@ export default function FollowUpList({ overdue = [], upcoming = [], onSelect }) 
           {upcoming.length === 0 && <p className="text-sm text-stone-400">No upcoming follow-ups</p>}
           {upcoming.map((l) => (
             <button key={l.id} type="button" onClick={() => onSelect?.(l)} className="w-full rounded-xl border border-stone-100 bg-white p-3 text-left transition hover:border-gold/40">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="font-semibold text-stone-900">{l.studentName}</span>
-                <StatusBadge status={l.status} />
+                {l.kind === 'activity' ? (
+                  <span className="dm-badge text-[10px] capitalize">{l.type || 'activity'}</span>
+                ) : (
+                  <StatusBadge status={l.status} />
+                )}
               </div>
               <p className="mt-1 flex items-center gap-1 text-xs text-stone-500">
-                <Calendar className="h-3 w-3" /> {formatDate(l.followUpDate)} · {l.partnerName}
+                <Calendar className="h-3 w-3" /> {formatDate(l.followUpDate)} · {l.partnerName || '—'}
+                {l.kind === 'activity' ? ` · ${l.createdByName || 'Staff'}` : ''}
               </p>
+              {l.kind === 'activity' && l.comment && (
+                <p className="mt-1 line-clamp-2 text-xs text-stone-600">{l.comment}</p>
+              )}
             </button>
           ))}
         </div>

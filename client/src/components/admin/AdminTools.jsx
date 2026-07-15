@@ -1,14 +1,12 @@
 import { useState } from 'react';
-import { Trash2, Key, RefreshCw, Eye } from 'lucide-react';
+import { Trash2, Key, RefreshCw } from 'lucide-react';
 import StatusBadge from '../StatusBadge';
 import Modal from '../Modal';
 import { formatDate, formatCurrency, partnerTypeLabel, PARTNER_TYPES, PARTNER_TIERS } from '../../utils/constants';
 
-export function PartnerRowActions({ partner, onEdit, onView, onDelete, onResetPwd, onRecalc }) {
+export function PartnerRowActions({ partner, onDelete, onResetPwd, onRecalc }) {
   return (
     <div className="flex flex-wrap gap-1">
-      <button type="button" onClick={() => onView(partner)} className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-blue-600" title="View"><Eye className="h-4 w-4" /></button>
-      <button type="button" onClick={() => onEdit(partner)} className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-gold-dark" title="Edit">Edit</button>
       <button type="button" onClick={() => onResetPwd(partner)} className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-orange" title="Reset password"><Key className="h-3 w-3" /></button>
       <button type="button" onClick={() => onRecalc(partner)} className="rounded p-1 text-stone-400 hover:bg-stone-100" title="Recalc stats"><RefreshCw className="h-3 w-3" /></button>
       <button type="button" onClick={() => onDelete(partner)} className="rounded p-1 text-stone-400 hover:bg-red-50 hover:text-red-600" title="Delete"><Trash2 className="h-3 w-3" /></button>
@@ -45,7 +43,6 @@ export function PartnerDetailModal({ partner, detail, open, onClose, onSave }) {
             <Field label="Phone" value={f.phone} onChange={(v) => setForm({ ...form, phone: v })} />
             <Field label="Organization" value={f.organization} onChange={(v) => setForm({ ...form, organization: v })} />
             <div><label className="dm-label">Tier</label><select className="dm-input" value={f.tier || 'bronze'} onChange={(e) => setForm({ ...form, tier: e.target.value })}>{PARTNER_TIERS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-            <div><label className="dm-label">Commission %</label><input type="number" className="dm-input" value={f.commissionRate} onChange={(e) => setForm({ ...form, commissionRate: Number(e.target.value) })} /></div>
             <div><label className="dm-label">Status</label><select className="dm-input" value={f.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{['pending','active','suspended','rejected'].map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
             <label className="flex items-center gap-2 sm:col-span-2"><input type="checkbox" checked={!!f.documentsVerified} onChange={(e) => setForm({ ...form, documentsVerified: e.target.checked })} /> Documents verified</label>
           </div>

@@ -156,14 +156,13 @@ export default function AdminModals({
                 ...partnerForm,
                 partnerType: type,
                 loginId: !editingPartner ? suggestLoginId(type) : partnerForm.loginId,
-                ...(type === 'agency' ? { commissionRate: 15, tier: 'gold' } : {}),
+                ...(type === 'agency' ? { tier: 'gold' } : {}),
               });
             }}>{PARTNER_TYPES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select></div>
             <div><label className="dm-label">Tier</label><select className="dm-input" value={partnerForm.tier} onChange={(e) => setPartnerForm({ ...partnerForm, tier: e.target.value })}>{PARTNER_TIERS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-            <div className="sm:col-span-2 rounded-lg border border-amber-100 bg-amber-50/50 p-3 text-xs text-amber-900">
-              Commission is now <strong>per product</strong> on the partner profile (Products &amp; rates). Fixed % below is legacy fallback only.
+            <div className="sm:col-span-2 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-xs text-emerald-900">
+              Commission is earned when products are sold (per-product rates on Products &amp; rates). No fixed partner % rate.
             </div>
-            <div><label className="dm-label">Legacy Commission % (fallback)</label><input type="number" className="dm-input" value={partnerForm.commissionRate} onChange={(e) => setPartnerForm({ ...partnerForm, commissionRate: Number(e.target.value) })} /></div>
             <div><label className="dm-label">Status</label><select className="dm-input" value={partnerForm.status} onChange={(e) => setPartnerForm({ ...partnerForm, status: e.target.value })}>{['pending', 'active', 'suspended', 'rejected'].map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
             {partnerForm.partnerType === 'agency' && (
               <>

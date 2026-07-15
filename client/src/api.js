@@ -222,6 +222,8 @@ export const api = {
     updateLead: (id, body) => request(`/staff/leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     productRateOverrides: (params = {}) => request(`/staff/product-rate-overrides?${qs(params)}`),
     upsertProductRateOverride: (body) => request('/staff/product-rate-overrides', { method: 'POST', body: JSON.stringify(body) }),
+    createPartnerActivity: (id, body) => request(`/staff/partners/${id}/activities`, { method: 'POST', body: JSON.stringify(body) }),
+    updatePartnerActivity: (id, body) => request(`/staff/partner-activities/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   },
 
   messages: {

@@ -245,6 +245,10 @@ export default function AdminDashboard() {
 
   const refresh = useCallback(() => load({ force: true }), [load]);
   const openLeadDetail = async (lead) => {
+    if (lead?.kind === 'activity' && lead.partnerId) {
+      setParams({ tab: 'partners', partnerId: lead.partnerId, inner: 'activity' });
+      return;
+    }
     const id = lead?.id || lead?._id;
     let full = lead;
     if (id && !lead?.studentName && !lead?.companyName && !lead?.status) {
@@ -348,7 +352,7 @@ export default function AdminDashboard() {
       partnerType: type,
       loginId: suggestLoginId(type),
       password: 'Partner@123',
-      ...(asAgency ? { commissionRate: 15, tier: 'gold', royaltyPercent: 8 } : {}),
+      ...(asAgency ? { tier: 'gold', royaltyPercent: 8 } : {}),
     });
     setPartnerModal(true);
   };

@@ -1185,13 +1185,15 @@ router.get('/partners/:id/activities', (req, res) => {
 router.post('/partners/:id/activities', (req, res) => {
   const partner = db.findUser({ id: req.params.id });
   if (!partner || partner.role !== 'partner') return res.status(404).json({ message: 'Partner not found' });
-  const { type, comment, at } = req.body;
+  const { type, comment, at, followUpDate } = req.body;
   if (!comment?.trim()) return res.status(400).json({ message: 'comment required' });
   const activity = db.createPartnerActivity({
     partnerId: req.params.id,
     type: type || 'note',
     comment,
     at,
+    followUpDate,
+    reminderFor: req.user.id,
     createdBy: req.user.id,
     createdByName: req.user.name,
     createdByRole: req.user.role,

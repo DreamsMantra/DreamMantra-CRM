@@ -11,7 +11,7 @@ export function suggestLoginId(partnerType) {
 
 export const emptyPartner = {
   name: '', email: '', phone: '', loginId: '', password: '', partnerType: 'teacher',
-  organization: '', city: '', state: '', address: '', commissionRate: 10,
+  organization: '', city: '', state: '', address: '',
   status: 'active', tier: 'bronze', notes: '',
   agencyName: '', territory: '', outletCount: 1, investmentTier: 'starter',
   operatingModel: 'single_outlet', royaltyPercent: 8, agreementDate: '',
@@ -22,7 +22,6 @@ export const SETTINGS_FIELDS = [
   { key: 'supportEmail', label: 'Support Email', type: 'email' },
   { key: 'supportPhone', label: 'Support Phone', type: 'text' },
   { key: 'whatsappNumber', label: 'WhatsApp Number', type: 'text' },
-  { key: 'defaultCommissionRate', label: 'Default Commission %', type: 'number' },
   { key: 'minPayoutAmount', label: 'Min Payout (₹)', type: 'number' },
   { key: 'welcomeMessage', label: 'Welcome Message', type: 'textarea' },
   { key: 'autoApprovePartners', label: 'Auto-approve Partners', type: 'checkbox' },

@@ -68,7 +68,22 @@ export default function StaffDashboard() {
   const title = getDashboardTitle(role);
   const setTab = (t) => setParams(t === 'overview' ? {} : { tab: t });
 
-  const openLead = (l) => {
+  const openLead = async (l) => {
+    if (l?.kind === 'activity') {
+      const go = window.confirm(
+        `Partner activity reminder\n\n${l.partnerName || 'Partner'}\n${l.comment || ''}\n\nDue ${l.followUpDate || ''}\n\nMark this follow-up done?`
+      );
+      if (go) {
+        try {
+          await api.staff.updatePartnerActivity(l.id, { completed: true });
+          flash('Follow-up marked done');
+          load();
+        } catch (err) {
+          flash(err?.message || 'Could not update follow-up');
+        }
+      }
+      return;
+    }
     setSelectedLead(l);
     setLeadForm({
       status: l.status || 'new',

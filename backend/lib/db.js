@@ -693,7 +693,66 @@ export function getFollowUps(filter = {}) {
   return sortByDate(leads.map((l) => ({ ...populateLead(l), followUpDate: l.followUpDate })), 'followUpDate', false);
 }
 
-/** Single pass buckets — avoids rescanning leads 3x */
+/** Activity reminder rows shaped like lead follow-ups for shared UI */
+function activityToFollowUpRow(a, partner) {
+  return {
+    id: a.id,
+    kind: 'activity',
+    activityId: a.id,
+    partnerId: a.partnerId,
+    partnerName: partner?.name || partner?.agencyName || 'Partner',
+    studentName: partner?.name || partner?.agencyName || 'Partner activity',
+    leadId: 'Activity',
+    status: a.completed ? 'completed' : 'follow_up',
+    followUpDate: a.followUpDate,
+    comment: a.comment,
+    type: a.type,
+    createdBy: a.createdBy,
+    createdByName: a.createdByName,
+    createdByRole: a.createdByRole,
+  };
+}
+
+export function getActivityFollowUpBuckets(filter = {}) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekLater = new Date(today);
+  weekLater.setDate(weekLater.getDate() + 7);
+  const todayStr = today.toDateString();
+
+  let list = (loadStore().partnerActivities || []).filter((a) => a.followUpDate && !a.completed);
+  if (filter.createdBy) list = list.filter((a) => a.createdBy === filter.createdBy);
+  if (filter.createdByRole) list = list.filter((a) => a.createdByRole === filter.createdByRole);
+  if (filter.partnerId) list = list.filter((a) => a.partnerId === filter.partnerId);
+
+  const overdue = [];
+  const upcoming = [];
+  const todayList = [];
+  for (const a of list) {
+    const partner = findUser({ id: a.partnerId });
+    const d = new Date(a.followUpDate);
+    const row = activityToFollowUpRow(a, partner);
+    if (d < today) overdue.push(row);
+    else if (d.toDateString() === todayStr) todayList.push(row);
+    if (d >= today && d <= weekLater) upcoming.push(row);
+  }
+  return {
+    overdue: sortByDate(overdue, 'followUpDate', false),
+    upcoming: sortByDate(upcoming, 'followUpDate', false),
+    today: sortByDate(todayList, 'followUpDate', false),
+  };
+}
+
+function mergeFollowUpBuckets(leadBuckets, activityBuckets) {
+  const merge = (a, b) => sortByDate([...(a || []), ...(b || [])], 'followUpDate', false);
+  return {
+    overdue: merge(leadBuckets.overdue, activityBuckets.overdue),
+    upcoming: merge(leadBuckets.upcoming, activityBuckets.upcoming),
+    today: merge(leadBuckets.today, activityBuckets.today),
+  };
+}
+
+/** Single pass buckets — avoids rescanning leads 3x. Includes activity reminders. */
 export function getFollowUpBuckets(filter = {}) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -715,16 +774,28 @@ export function getFollowUpBuckets(filter = {}) {
   const todayList = [];
   for (const l of leads) {
     const d = new Date(l.followUpDate);
-    const row = { ...populateLead(l), followUpDate: l.followUpDate };
+    const row = { ...populateLead(l), followUpDate: l.followUpDate, kind: 'lead' };
     if (d < today) overdue.push(row);
     else if (d.toDateString() === todayStr) todayList.push(row);
     if (d >= today && d <= weekLater) upcoming.push(row);
   }
-  return {
+  const leadBuckets = {
     overdue: sortByDate(overdue, 'followUpDate', false),
     upcoming: sortByDate(upcoming, 'followUpDate', false),
     today: sortByDate(todayList, 'followUpDate', false),
   };
+
+  // Sales/counsellor: only their own activity reminders; admin/others: all (unless createdBy set)
+  const activityFilter = {};
+  if (filter.activityCreatedBy) activityFilter.createdBy = filter.activityCreatedBy;
+  else if (filter.assignedSalesId && !filter.includeAllActivityFollowUps) {
+    activityFilter.createdBy = filter.assignedSalesId;
+  } else if (filter.assignedCounsellorId && !filter.includeAllActivityFollowUps) {
+    activityFilter.createdBy = filter.assignedCounsellorId;
+  }
+  if (filter.partnerId) activityFilter.partnerId = filter.partnerId;
+
+  return mergeFollowUpBuckets(leadBuckets, getActivityFollowUpBuckets(activityFilter));
 }
 
 export function findDuplicateLeads(phone, excludeId = null) {
@@ -1976,12 +2047,17 @@ export function getPartnerActivities(partnerId) {
 export function createPartnerActivity(data) {
   const store = loadStore();
   if (!store.partnerActivities) store.partnerActivities = [];
+  const followUpDate = data.followUpDate ? String(data.followUpDate).slice(0, 10) : null;
   const row = {
     id: newId(),
     partnerId: data.partnerId,
     type: data.type || 'note',
     comment: (data.comment || '').trim(),
     at: data.at || now(),
+    followUpDate,
+    reminderFor: followUpDate ? (data.reminderFor || data.createdBy || null) : null,
+    completed: false,
+    completedAt: null,
     createdBy: data.createdBy || null,
     createdByName: data.createdByName || '',
     createdByRole: data.createdByRole || '',
@@ -1997,9 +2073,17 @@ export function updatePartnerActivity(id, updates) {
   const store = loadStore();
   const idx = (store.partnerActivities || []).findIndex((a) => a.id === id);
   if (idx < 0) return null;
-  const allowed = ['type', 'comment', 'at'];
+  const allowed = ['type', 'comment', 'at', 'followUpDate', 'completed', 'reminderFor'];
   const patch = {};
   allowed.forEach((k) => { if (updates[k] !== undefined) patch[k] = updates[k]; });
+  if (patch.followUpDate !== undefined) {
+    patch.followUpDate = patch.followUpDate ? String(patch.followUpDate).slice(0, 10) : null;
+    if (patch.followUpDate && !store.partnerActivities[idx].reminderFor) {
+      patch.reminderFor = store.partnerActivities[idx].createdBy;
+    }
+  }
+  if (patch.completed === true) patch.completedAt = now();
+  if (patch.completed === false) patch.completedAt = null;
   store.partnerActivities[idx] = { ...store.partnerActivities[idx], ...patch, updatedAt: now() };
   saveStore(store);
   return store.partnerActivities[idx];

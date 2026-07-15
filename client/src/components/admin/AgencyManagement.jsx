@@ -7,7 +7,7 @@ import Modal from '../Modal';
 
 const EMPTY_AGENCY = {
   agencyName: '', territory: '', outletCount: 1, investmentTier: 'starter',
-  operatingModel: 'single_outlet', royaltyPercent: 8, status: 'active', commissionRate: 15, tier: 'gold',
+  operatingModel: 'single_outlet', royaltyPercent: 8, status: 'active', tier: 'gold',
 };
 
 export default function AgencyManagement({ onEdit, onAdd }) {
@@ -36,7 +36,6 @@ export default function AgencyManagement({ onEdit, onAdd }) {
       operatingModel: a.operatingModel || 'single_outlet',
       royaltyPercent: a.royaltyPercent ?? 8,
       status: a.status || 'active',
-      commissionRate: a.commissionRate ?? 15,
       tier: a.tier || 'gold',
     });
     setEditModal(true);
@@ -110,7 +109,9 @@ export default function AgencyManagement({ onEdit, onAdd }) {
             <input type="number" min={1} className="dm-input" value={editForm.outletCount} onChange={(e) => setEditForm({ ...editForm, outletCount: Number(e.target.value) })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="dm-label">Commission %</label><input type="number" className="dm-input" value={editForm.commissionRate} onChange={(e) => setEditForm({ ...editForm, commissionRate: Number(e.target.value) })} /></div>
+            <div className="col-span-2 rounded-lg border border-emerald-100 bg-emerald-50/40 p-2 text-xs text-emerald-900">
+              Commission is earned only when products are sold (set on Products &amp; rates).
+            </div>
             <div><label className="dm-label">Status</label>
               <select className="dm-input" value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
                 {['active', 'pending', 'suspended'].map((s) => <option key={s} value={s}>{s}</option>)}

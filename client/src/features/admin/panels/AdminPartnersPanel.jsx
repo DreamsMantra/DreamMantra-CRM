@@ -92,8 +92,6 @@ export default function AdminPartnersPanel({
                 <td>
                   <PartnerRowActions
                     partner={p}
-                    onView={viewPartnerDetail}
-                    onEdit={(x) => { setEditingPartner(x); setPartnerForm({ ...x, password: '' }); setPartnerModal(true); }}
                     onDelete={deletePartner}
                     onResetPwd={resetPassword}
                     onRecalc={async (x) => { await api.admin.recalculatePartner(x.id); flash('Stats recalculated'); load(); }}

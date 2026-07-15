@@ -104,7 +104,14 @@ router.post('/calls', (req, res) => {
 });
 
 router.get('/follow-ups', (req, res) => {
-  res.json(db.getFollowUpBuckets(leadScopeFilter(req.user)));
+  const filter = {
+    ...leadScopeFilter(req.user),
+    // Sales/counsellor only get activity reminders they set; report_mgmt sees all
+    ...(req.user.role === 'report_management'
+      ? { includeAllActivityFollowUps: true }
+      : { activityCreatedBy: req.user.id }),
+  };
+  res.json(db.getFollowUpBuckets(filter));
 });
 
 /** Sales can set per-lead/product price & commission overrides */
@@ -149,6 +156,8 @@ router.post('/partners/:id/activities', (req, res) => {
     type: req.body.type || 'note',
     comment: req.body.comment,
     at: req.body.at,
+    followUpDate: req.body.followUpDate,
+    reminderFor: req.user.id,
     createdBy: req.user.id,
     createdByName: req.user.name,
     createdByRole: req.user.role,

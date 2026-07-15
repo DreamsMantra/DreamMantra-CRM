@@ -137,8 +137,8 @@ export default function FranchiseHub({ onRefresh }) {
           <p className="mt-1 font-medium text-stone-900">{partner.agreementDate || '—'}</p>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase text-stone-500">Commission Rate</p>
-          <p className="mt-1 font-medium text-stone-900">{partner.commissionRate}% per conversion</p>
+          <p className="text-xs font-semibold uppercase text-stone-500">Commission</p>
+          <p className="mt-1 font-medium text-stone-900">Earned on products sold</p>
         </div>
         <div>
           <p className="text-xs font-semibold uppercase text-stone-500">Referral Code</p>

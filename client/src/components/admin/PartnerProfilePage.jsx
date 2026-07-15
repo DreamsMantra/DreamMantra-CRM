@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ArrowLeft, KeyRound, MessageSquare, Save, Plus, IndianRupee, FolderOpen, Package,
-  Activity, ClipboardList, FolderKanban,
+  Activity, ClipboardList, FolderKanban, Search, Check, Trash2, CalendarClock,
 } from 'lucide-react';
 import StatusBadge from '../../components/StatusBadge';
 import SectionBlock from '../../components/layout/SectionBlock';
@@ -18,6 +18,7 @@ const ACTIVITY_TYPES = [
   { value: 'meeting', label: 'Meeting' },
   { value: 'email', label: 'Email' },
   { value: 'note', label: 'Note' },
+  { value: 'visit', label: 'Site visit' },
 ];
 
 const BASE_TABS = [
@@ -45,7 +46,10 @@ export default function PartnerProfilePage({
   const [rateDrafts, setRateDrafts] = useState({});
   const [filterRules, setFilterRules] = useState([]);
   const [journeyLeadId, setJourneyLeadId] = useState(null);
-  const [activityForm, setActivityForm] = useState({ type: 'note', comment: '', at: '' });
+  const [activityForm, setActivityForm] = useState({ type: 'note', comment: '', at: '', followUpDate: '' });
+  const [activitySearch, setActivitySearch] = useState('');
+  const [activityTypeFilter, setActivityTypeFilter] = useState('all');
+  const [activityStatusFilter, setActivityStatusFilter] = useState('all');
   const [projectForm, setProjectForm] = useState({ name: '', description: '' });
   const [assignProjectId, setAssignProjectId] = useState('');
   const [selectedLeadIds, setSelectedLeadIds] = useState([]);
@@ -117,6 +121,27 @@ export default function PartnerProfilePage({
     () => (detail?.leads || []).find((l) => l.id === journeyLeadId) || null,
     [detail?.leads, journeyLeadId]
   );
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const activitiesList = detail?.activities || [];
+  const filteredActivities = useMemo(() => {
+    const q = activitySearch.trim().toLowerCase();
+    return activitiesList.filter((a) => {
+      if (activityTypeFilter !== 'all' && a.type !== activityTypeFilter) return false;
+      if (activityStatusFilter === 'open' && a.completed) return false;
+      if (activityStatusFilter === 'done' && !a.completed) return false;
+      if (activityStatusFilter === 'reminders' && !a.followUpDate) return false;
+      if (activityStatusFilter === 'overdue') {
+        if (!a.followUpDate || a.completed || a.followUpDate >= todayStr) return false;
+      }
+      if (!q) return true;
+      const hay = `${a.comment || ''} ${a.createdByName || ''} ${a.type || ''} ${a.followUpDate || ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [activitiesList, activitySearch, activityTypeFilter, activityStatusFilter, todayStr]);
+
+  const openReminders = activitiesList.filter((a) => a.followUpDate && !a.completed);
+  const overdueReminders = openReminders.filter((a) => a.followUpDate < todayStr);
 
   const saveProfile = async () => {
     try {
@@ -200,9 +225,27 @@ export default function PartnerProfilePage({
         type: activityForm.type,
         comment: activityForm.comment,
         at: activityForm.at || new Date().toISOString(),
+        followUpDate: activityForm.followUpDate || null,
       });
-      flash?.('Activity logged');
-      setActivityForm({ type: 'note', comment: '', at: '' });
+      flash?.(activityForm.followUpDate ? 'Activity logged with follow-up reminder' : 'Activity logged');
+      setActivityForm({ type: 'note', comment: '', at: '', followUpDate: '' });
+      load();
+    } catch (err) { fail?.(err); }
+  };
+
+  const completeActivity = async (id) => {
+    try {
+      await api.admin.updatePartnerActivity(id, { completed: true });
+      flash?.('Follow-up marked done');
+      load();
+    } catch (err) { fail?.(err); }
+  };
+
+  const deleteActivity = async (id) => {
+    if (!confirm('Delete this activity entry?')) return;
+    try {
+      await api.admin.deletePartnerActivity(id);
+      flash?.('Activity deleted');
       load();
     } catch (err) { fail?.(err); }
   };
@@ -255,7 +298,7 @@ export default function PartnerProfilePage({
   const resources = detail.resources || [];
   const productRates = detail.productRates || [];
   const payouts = detail.payouts || [];
-  const activities = detail.activities || [];
+  const activities = activitiesList;
   const projects = detail.projects || [];
   const stages = detail.stageBreakdown || {};
 
@@ -619,8 +662,18 @@ export default function PartnerProfilePage({
       )}
 
       {activeTab === 'activity' && (
-        <SectionBlock title="Activity log" description="Calls, WhatsApp, meetings, notes — Super Admin, Sales & Counsellors">
-          <form onSubmit={addActivity} className="mb-4 grid gap-3 rounded-xl border border-stone-200 bg-stone-50 p-4 sm:grid-cols-4">
+        <SectionBlock title="Activity log" description="Calls, WhatsApp, meetings, notes — set a follow-up date to remind the person who logs it. Super Admin sees all reminders.">
+          {(openReminders.length > 0) && (
+            <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${overdueReminders.length ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+              <div className="flex items-center gap-2 font-semibold">
+                <CalendarClock className="h-4 w-4" />
+                {openReminders.length} open follow-up{openReminders.length === 1 ? '' : 's'}
+                {overdueReminders.length ? ` · ${overdueReminders.length} overdue` : ''}
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={addActivity} className="mb-4 grid gap-3 rounded-xl border border-stone-200 bg-stone-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="dm-label">Type</label>
               <select className="dm-input" value={activityForm.type} onChange={(e) => setActivityForm({ ...activityForm, type: e.target.value })}>
@@ -628,27 +681,89 @@ export default function PartnerProfilePage({
               </select>
             </div>
             <div>
-              <label className="dm-label">Date & time</label>
+              <label className="dm-label">Activity date & time</label>
               <input type="datetime-local" className="dm-input" value={activityForm.at} onChange={(e) => setActivityForm({ ...activityForm, at: e.target.value })} />
             </div>
-            <div className="sm:col-span-2">
-              <label className="dm-label">Comment</label>
-              <input className="dm-input" required placeholder="What was discussed…" value={activityForm.comment} onChange={(e) => setActivityForm({ ...activityForm, comment: e.target.value })} />
+            <div>
+              <label className="dm-label">Follow-up reminder</label>
+              <input type="date" className="dm-input" value={activityForm.followUpDate} onChange={(e) => setActivityForm({ ...activityForm, followUpDate: e.target.value })} />
             </div>
-            <button type="submit" className="dm-btn-primary sm:col-span-4 text-sm"><Plus className="h-4 w-4" /> Add to activity log</button>
+            <div className="sm:col-span-2 lg:col-span-4">
+              <label className="dm-label">Comment</label>
+              <input className="dm-input" required placeholder="What was discussed / next step…" value={activityForm.comment} onChange={(e) => setActivityForm({ ...activityForm, comment: e.target.value })} />
+            </div>
+            <p className="sm:col-span-2 lg:col-span-3 text-xs text-stone-500">
+              If you set a follow-up date, you’ll get the reminder (Sales → Sales, Counsellor → Counsellor). Super Admin sees every reminder on Follow-ups.
+            </p>
+            <button type="submit" className="dm-btn-primary text-sm lg:justify-self-end"><Plus className="h-4 w-4" /> Add activity</button>
           </form>
+
+          <div className="mb-4 flex flex-wrap items-end gap-3">
+            <div className="relative min-w-[200px] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+              <input
+                className="dm-input pl-9"
+                placeholder="Search comments, people, types…"
+                value={activitySearch}
+                onChange={(e) => setActivitySearch(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="dm-label">Type</label>
+              <select className="dm-input" value={activityTypeFilter} onChange={(e) => setActivityTypeFilter(e.target.value)}>
+                <option value="all">All types</option>
+                {ACTIVITY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="dm-label">Filter</label>
+              <select className="dm-input" value={activityStatusFilter} onChange={(e) => setActivityStatusFilter(e.target.value)}>
+                <option value="all">All</option>
+                <option value="open">Open</option>
+                <option value="reminders">With reminder</option>
+                <option value="overdue">Overdue</option>
+                <option value="done">Completed</option>
+              </select>
+            </div>
+            <p className="pb-2 text-xs text-stone-400">{filteredActivities.length} shown</p>
+          </div>
+
           <div className="relative space-y-0 border-l-2 border-stone-200 pl-4">
-            {activities.map((a) => (
-              <div key={a.id} className="relative pb-5">
-                <span className="absolute -left-[1.35rem] top-1 h-2.5 w-2.5 rounded-full bg-orange ring-2 ring-white" />
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="dm-badge text-[10px] capitalize">{a.type}</span>
-                  <span className="text-xs text-stone-400">{formatDate(a.at || a.createdAt)} · {a.createdByName || '—'} ({a.createdByRole || ''})</span>
+            {filteredActivities.map((a) => {
+              const isOverdue = a.followUpDate && !a.completed && a.followUpDate < todayStr;
+              return (
+                <div key={a.id} className={`relative pb-5 ${a.completed ? 'opacity-60' : ''}`}>
+                  <span className={`absolute -left-[1.35rem] top-1 h-2.5 w-2.5 rounded-full ring-2 ring-white ${isOverdue ? 'bg-red-500' : a.followUpDate && !a.completed ? 'bg-amber-500' : 'bg-orange'}`} />
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="dm-badge text-[10px] capitalize">{a.type}</span>
+                        <span className="text-xs text-stone-400">{formatDate(a.at || a.createdAt)} · {a.createdByName || '—'} ({a.createdByRole || ''})</span>
+                        {a.completed && <span className="text-[10px] font-semibold uppercase text-emerald-600">Done</span>}
+                      </div>
+                      <p className="mt-1 text-sm text-stone-800">{a.comment}</p>
+                      {a.followUpDate && (
+                        <p className={`mt-1 text-xs font-medium ${isOverdue ? 'text-red-600' : 'text-amber-700'}`}>
+                          Follow-up {formatDate(a.followUpDate)}{isOverdue ? ' · overdue' : ''}
+                          {a.createdByName ? ` · reminder for ${a.createdByName}` : ''}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 gap-1">
+                      {a.followUpDate && !a.completed && (
+                        <button type="button" className="rounded p-1.5 text-emerald-600 hover:bg-emerald-50" title="Mark follow-up done" onClick={() => completeActivity(a.id)}>
+                          <Check className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button type="button" className="rounded p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600" title="Delete" onClick={() => deleteActivity(a.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-1 text-sm text-stone-800">{a.comment}</p>
-              </div>
-            ))}
-            {!activities.length && <p className="py-4 text-sm text-stone-400">No activity yet.</p>}
+              );
+            })}
+            {!filteredActivities.length && <p className="py-4 text-sm text-stone-400">{activities.length ? 'No matches for this search/filter.' : 'No activity yet.'}</p>}
           </div>
         </SectionBlock>
       )}
