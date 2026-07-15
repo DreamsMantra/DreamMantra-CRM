@@ -144,9 +144,12 @@ export function updateUser(id, updates) {
 export async function seedAdmin() {
   const users = getUsers();
   const email = (process.env.ADMIN_EMAIL || 'admin@dreammantra.in').toLowerCase();
-  // Migrate away from legacy Admin@123 even if old env still has it
+  // Migrate away from legacy defaults even if old env still has them
   const rawPassword = process.env.ADMIN_PASSWORD;
-  const password = (!rawPassword || rawPassword === 'Admin@123') ? 'DreamMantra@2026' : rawPassword;
+  const legacyPasswords = ['Admin@123', 'DreamMantra@2026'];
+  const password = (!rawPassword || legacyPasswords.includes(rawPassword))
+    ? 'Dreams.unlocked@2000'
+    : rawPassword;
   const hash = await bcrypt.hash(password, 10);
 
   const legacyAdmin = users.find((u) => u.role === 'admin');

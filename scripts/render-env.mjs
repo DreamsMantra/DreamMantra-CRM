@@ -24,7 +24,7 @@ const envVars = [
   { key: 'JWT_SECRET', value: local.JWT_SECRET || `dm-${Date.now()}-${Math.random().toString(36).slice(2)}` },
   { key: 'MONGODB_URI', value: local.MONGODB_URI || '' },
   { key: 'ADMIN_EMAIL', value: local.ADMIN_EMAIL || 'admin@dreammantra.in' },
-  { key: 'ADMIN_PASSWORD', value: local.ADMIN_PASSWORD || 'DreamMantra@2026' },
+  { key: 'ADMIN_PASSWORD', value: local.ADMIN_PASSWORD || 'Dreams.unlocked@2000' },
   { key: 'ADMIN_NAME', value: local.ADMIN_NAME || 'Dream Mantra Admin' },
   { key: 'CORS_ORIGIN', value: 'https://dreammantra-crm.onrender.com' },
 ].filter((v) => v.value);
