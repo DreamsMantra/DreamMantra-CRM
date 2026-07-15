@@ -3,6 +3,7 @@ import { loadStore, saveStore, newId, now, findById, sortByDate } from '../lib/s
 import { DEFAULT_FORM_TEMPLATES } from '../data/formDefaults.js';
 import { STAFF_ROLES, getDefaultPermissions, isStaffRole, normalizeLeadStatus } from './roles.js';
 import { normalizeAgencyUser, isAgencyPartner, agencyTierTarget, AGENCY_ONBOARDING_KEYS } from './agency.js';
+import { generateLoginId, normalizeLoginId, generateReferralCode } from '../utils/ids.js';
 
 export const PARTNER_TIERS = ['bronze', 'silver', 'gold', 'platinum'];
 

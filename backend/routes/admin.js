@@ -77,6 +77,7 @@ router.get('/partners', (req, res) => {
 });
 
 router.post('/partners', async (req, res) => {
+  try {
   const {
     name, email, phone, password, loginId: rawLoginId, partnerType, organization,
     city, state, address, commissionRate, status, notes,
@@ -170,6 +171,10 @@ router.post('/partners', async (req, res) => {
       loginUrl: '/login',
     },
   });
+  } catch (err) {
+    console.error('Create partner error:', err);
+    res.status(500).json({ message: err.message || 'Failed to create partner' });
+  }
 });
 
 router.patch('/partners/:id', async (req, res) => {

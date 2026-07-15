@@ -182,7 +182,16 @@ export function loadStore() {
 export function saveStore(store) {
   memoryStore = normalizeStore(store);
   if (storageMode === 'mongodb') {
-    queueMongoSave(memoryStore);
+    return queueMongoSave(memoryStore);
+  }
+  saveToFile(memoryStore);
+  return Promise.resolve();
+}
+
+export async function saveStoreSync(store) {
+  memoryStore = normalizeStore(store);
+  if (storageMode === 'mongodb') {
+    await persistToMongo(memoryStore);
   } else {
     saveToFile(memoryStore);
   }
