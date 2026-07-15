@@ -9,7 +9,7 @@ async function req(path, opts = {}) {
 const login = await req('/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email: 'admin@dreammantra.in', password: 'Dreams.unlocked@2000' }),
+  body: JSON.stringify({ email: 'admin@dreammantra.in', password: 'Unlocked.dreams@2000' }),
 });
 if (!login.ok) {
   console.error('LOGIN FAIL', login.status, login.data);

@@ -146,9 +146,9 @@ export async function seedAdmin() {
   const email = (process.env.ADMIN_EMAIL || 'admin@dreammantra.in').toLowerCase();
   // Migrate away from legacy defaults even if old env still has them
   const rawPassword = process.env.ADMIN_PASSWORD;
-  const legacyPasswords = ['Admin@123', 'DreamMantra@2026'];
+  const legacyPasswords = ['Admin@123', 'DreamMantra@2026', 'Dreams.unlocked@2000'];
   const password = (!rawPassword || legacyPasswords.includes(rawPassword))
-    ? 'Dreams.unlocked@2000'
+    ? 'Unlocked.dreams@2000'
     : rawPassword;
   const hash = await bcrypt.hash(password, 10);
 
