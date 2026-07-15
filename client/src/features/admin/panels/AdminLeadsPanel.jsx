@@ -1,9 +1,11 @@
 import { Plus, Search } from 'lucide-react';
+import { useState } from 'react';
 import DashboardSection from '../../../components/layout/DashboardSection';
 import StatusBadge from '../../../components/StatusBadge';
 import FollowUpList from '../../../components/FollowUpList';
 import LeadKanban from '../../../components/LeadKanban';
 import PartnerSelect from '../../../components/PartnerSelect';
+import CustomLeadFilters, { applyCustomLeadFilters } from '../../../components/CustomLeadFilters';
 import { BulkActionBar, SelectCheckbox } from '../../../components/admin/AdminTools';
 import { LEAD_STATUSES, formatDate } from '../../../utils/constants';
 import { leadDisplayName, leadDisplayPhone, leadLifecycleLabel } from '../../../config/adminTabs';
@@ -46,11 +48,15 @@ export default function AdminLeadsPanel({
   leadAssigneeFilter, setLeadAssigneeFilter, staffUsers = [],
   load, toggleAll, bulkLeads, openQuickLead, openLeadDetail, flash,
 }) {
-  const displayLeads = filterLeadsClient(leads, {
-    dateFrom: leadDateFrom,
-    dateTo: leadDateTo,
-    assignee: leadAssigneeFilter,
-  });
+  const [customRules, setCustomRules] = useState([]);
+  const displayLeads = applyCustomLeadFilters(
+    filterLeadsClient(leads, {
+      dateFrom: leadDateFrom,
+      dateTo: leadDateTo,
+      assignee: leadAssigneeFilter,
+    }),
+    customRules
+  );
 
   return (
     <DashboardSection
@@ -164,6 +170,7 @@ export default function AdminLeadsPanel({
             <button type="button" onClick={load} className="dm-btn-ghost"><Search className="h-4 w-4" /></button>
             <button type="button" onClick={() => openQuickLead?.(leadTypeFilter === 'business' ? 'business' : 'student')} className="dm-btn-primary"><Plus className="h-4 w-4" /> Add Lead</button>
           </div>
+          <CustomLeadFilters rules={customRules} onChange={setCustomRules} statuses={LEAD_STATUSES} />
           <div className="dm-card overflow-x-auto">
             <table className="dm-table w-full">
               <thead>

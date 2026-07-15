@@ -14,6 +14,8 @@ export default function AgencyHub({ onRefresh }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [projects, setProjects] = useState([]);
+  const [projectName, setProjectName] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -21,6 +23,10 @@ export default function AgencyHub({ onRefresh }) {
     try {
       const hub = await api.partner.agencyHub();
       setData(hub);
+      try {
+        const pr = await api.partner.projects();
+        setProjects(pr.projects || []);
+      } catch { setProjects([]); }
     } catch (err) {
       setError(err.message || 'Failed to load agency hub');
     } finally {
@@ -35,6 +41,21 @@ export default function AgencyHub({ onRefresh }) {
     await api.partner.updateAgencyOnboarding({ [key]: value });
     load();
     onRefresh?.();
+  };
+
+  const createProject = async (e) => {
+    e.preventDefault();
+    if (!projectName.trim()) return;
+    await api.partner.createProject({ name: projectName.trim() });
+    setProjectName('');
+    load();
+  };
+
+  const renameProject = async (proj) => {
+    const name = prompt('Rename project', proj.name);
+    if (!name?.trim()) return;
+    await api.partner.updateProject(proj.id, { name: name.trim() });
+    load();
   };
 
   if (loading) return <div className="dm-card p-12 text-center text-stone-400">Loading agency hub...</div>;
@@ -105,6 +126,31 @@ export default function AgencyHub({ onRefresh }) {
         <div className="dm-card p-6">
           <h3 className="mb-4 font-display text-lg font-bold text-stone-900">Lead Trend (6 months)</h3>
           {chartData.length > 0 ? <BarChart data={chartData} color="#d97706" /> : <p className="text-stone-400 text-sm">No data yet</p>}
+        </div>
+      </div>
+
+      <div className="dm-card p-6">
+        <h3 className="mb-4 font-display text-lg font-bold text-stone-900">Projects (schools / campaigns)</h3>
+        <form onSubmit={createProject} className="mb-4 flex flex-wrap gap-2">
+          <input className="dm-input min-w-[14rem] flex-1" placeholder="e.g. ABC School visit" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
+          <button type="submit" className="dm-btn-primary text-sm">Create project</button>
+        </form>
+        <div className="space-y-2">
+          {projects.map((pr) => (
+            <div key={pr.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-stone-100 px-3 py-2 text-sm">
+              <div>
+                <p className="font-semibold">{pr.name}</p>
+                <p className="text-xs text-stone-500">{pr.leadCount || 0} leads · {pr.converted || 0} converted</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {Object.entries(pr.stages || {}).map(([st, n]) => (
+                    <span key={st} className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold capitalize">{st.replace(/_/g, ' ')}: {n}</span>
+                  ))}
+                </div>
+              </div>
+              <button type="button" className="text-xs text-gold-dark" onClick={() => renameProject(pr)}>Rename</button>
+            </div>
+          ))}
+          {!projects.length && <p className="text-sm text-stone-400">Create a project for each school or campaign batch.</p>}
         </div>
       </div>
 

@@ -137,6 +137,46 @@ router.post('/product-rate-overrides', (req, res) => {
   }
 });
 
+// Sales / counsellor partner activity + projects
+router.get('/partners/:id/activities', (req, res) => {
+  res.json({ activities: db.getPartnerActivities(req.params.id) });
+});
+
+router.post('/partners/:id/activities', (req, res) => {
+  if (!req.body.comment?.trim()) return res.status(400).json({ message: 'comment required' });
+  const activity = db.createPartnerActivity({
+    partnerId: req.params.id,
+    type: req.body.type || 'note',
+    comment: req.body.comment,
+    at: req.body.at,
+    createdBy: req.user.id,
+    createdByName: req.user.name,
+    createdByRole: req.user.role,
+  });
+  res.status(201).json({ activity });
+});
+
+router.patch('/partner-activities/:id', (req, res) => {
+  const updated = db.updatePartnerActivity(req.params.id, req.body);
+  if (!updated) return res.status(404).json({ message: 'Not found' });
+  res.json({ activity: updated });
+});
+
+router.post('/partners/:id/projects', (req, res) => {
+  if (req.user.role !== 'sales_executive' && req.user.role !== 'report_management') {
+    return res.status(403).json({ message: 'Not allowed' });
+  }
+  if (!req.body.name?.trim()) return res.status(400).json({ message: 'name required' });
+  const project = db.createAgencyProject({
+    partnerId: req.params.id,
+    name: req.body.name,
+    description: req.body.description,
+    createdBy: req.user.id,
+    createdByName: req.user.name,
+  });
+  res.status(201).json({ project });
+});
+
 router.patch('/leads/:id', async (req, res) => {
   const lead = db.findLead(req.params.id);
   if (!canAccessLead(req.user, lead)) {

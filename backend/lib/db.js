@@ -198,7 +198,10 @@ export function getLeads(filter = {}) {
   if (filter.agencyId) leads = leads.filter((l) => l.partnerId === filter.agencyId || l.agencyId === filter.agencyId);
   if (filter.project && filter.project !== 'all') {
     const q = String(filter.project).toLowerCase();
-    leads = leads.filter((l) => (l.project || '').toLowerCase() === q);
+    leads = leads.filter((l) => (l.project || '').toLowerCase() === q || (l.projectId || '').toLowerCase() === q);
+  }
+  if (filter.projectId && filter.projectId !== 'all') {
+    leads = leads.filter((l) => l.projectId === filter.projectId);
   }
   if (filter.status && filter.status !== 'all') leads = leads.filter((l) => l.status === filter.status);
   if (filter.priority && filter.priority !== 'all') leads = leads.filter((l) => l.priority === filter.priority);
@@ -233,6 +236,7 @@ export function createLead(data) {
     id: newId(),
     ...data,
     project: data.project != null ? data.project : null,
+    projectId: data.projectId || null,
     createdAt: now(),
     updatedAt: now(),
   };
@@ -841,6 +845,16 @@ export function getPartnerDetail(id) {
   const payouts = getPayoutRequests({ partnerId: id });
   const paid = commissions.filter((c) => c.status === 'paid').reduce((s, c) => s + (c.amount || 0), 0);
   const pending = commissions.filter((c) => c.status === 'pending' || c.status === 'approved').reduce((s, c) => s + (c.amount || 0), 0);
+  const activities = getPartnerActivities(id);
+  const projects = getAgencyProjects(id).map((proj) => enrichProject(proj, leads));
+  const stageBreakdown = {};
+  leads.forEach((l) => {
+    const s = l.status || 'new';
+    stageBreakdown[s] = (stageBreakdown[s] || 0) + 1;
+  });
+  const upcomingFollowUps = leads
+    .filter((l) => l.followUpDate && !['completed', 'converted', 'lost'].includes(l.status))
+    .sort((a, b) => new Date(a.followUpDate) - new Date(b.followUpDate));
   return {
     partner: userToSafeJSON(partner),
     leads: leads.map((l) => ({ ...l, _id: l.id })),
@@ -848,12 +862,18 @@ export function getPartnerDetail(id) {
     resources,
     productRates,
     payouts,
+    activities,
+    projects,
+    stageBreakdown,
+    nextFollowUp: upcomingFollowUps[0] || null,
     stats: {
       totalLeads: leads.length,
       converted: leads.filter((l) => ['converted', 'completed'].includes(l.status)).length,
       pendingCommission: pending,
       paidCommission: paid,
       totalEarnings: partner.totalEarnings || paid,
+      openFollowUps: upcomingFollowUps.length,
+      projectCount: projects.length,
     },
   };
 }
@@ -1884,3 +1904,134 @@ export function getEnterpriseDashboard() {
   };
 }
 
+
+// --- Partner activity log (calls / WhatsApp / meetings / notes) ---
+export function getPartnerActivities(partnerId) {
+  let list = loadStore().partnerActivities || [];
+  if (partnerId) list = list.filter((a) => a.partnerId === partnerId);
+  return sortByDate(list);
+}
+
+export function createPartnerActivity(data) {
+  const store = loadStore();
+  if (!store.partnerActivities) store.partnerActivities = [];
+  const row = {
+    id: newId(),
+    partnerId: data.partnerId,
+    type: data.type || 'note',
+    comment: (data.comment || '').trim(),
+    at: data.at || now(),
+    createdBy: data.createdBy || null,
+    createdByName: data.createdByName || '',
+    createdByRole: data.createdByRole || '',
+    createdAt: now(),
+    updatedAt: now(),
+  };
+  store.partnerActivities.unshift(row);
+  saveStore(store);
+  return row;
+}
+
+export function updatePartnerActivity(id, updates) {
+  const store = loadStore();
+  const idx = (store.partnerActivities || []).findIndex((a) => a.id === id);
+  if (idx < 0) return null;
+  const allowed = ['type', 'comment', 'at'];
+  const patch = {};
+  allowed.forEach((k) => { if (updates[k] !== undefined) patch[k] = updates[k]; });
+  store.partnerActivities[idx] = { ...store.partnerActivities[idx], ...patch, updatedAt: now() };
+  saveStore(store);
+  return store.partnerActivities[idx];
+}
+
+export function deletePartnerActivity(id) {
+  const store = loadStore();
+  const before = store.partnerActivities || [];
+  const removed = before.find((a) => a.id === id);
+  if (!removed) return null;
+  store.partnerActivities = before.filter((a) => a.id !== id);
+  saveStore(store);
+  return removed;
+}
+
+// --- Agency projects (school visits / campaigns) ---
+export function getAgencyProjects(partnerId) {
+  let list = loadStore().agencyProjects || [];
+  if (partnerId) list = list.filter((p) => p.partnerId === partnerId);
+  return sortByDate(list);
+}
+
+export function enrichProject(project, leads = null) {
+  const all = leads || getLeads({ partnerId: project.partnerId });
+  const projLeads = all.filter((l) => l.projectId === project.id || (l.project || '').toLowerCase() === (project.name || '').toLowerCase());
+  const stages = {};
+  projLeads.forEach((l) => {
+    const s = l.status || 'new';
+    stages[s] = (stages[s] || 0) + 1;
+  });
+  return {
+    ...project,
+    leadCount: projLeads.length,
+    stages,
+    converted: projLeads.filter((l) => ['converted', 'completed'].includes(l.status)).length,
+  };
+}
+
+export function createAgencyProject(data) {
+  const store = loadStore();
+  if (!store.agencyProjects) store.agencyProjects = [];
+  const row = {
+    id: newId(),
+    partnerId: data.partnerId,
+    name: (data.name || '').trim(),
+    description: (data.description || '').trim(),
+    createdBy: data.createdBy || null,
+    createdByName: data.createdByName || '',
+    createdAt: now(),
+    updatedAt: now(),
+  };
+  store.agencyProjects.unshift(row);
+  saveStore(store);
+  return enrichProject(row);
+}
+
+export function updateAgencyProject(id, updates) {
+  const store = loadStore();
+  const idx = (store.agencyProjects || []).findIndex((p) => p.id === id);
+  if (idx < 0) return null;
+  const patch = {};
+  if (updates.name !== undefined) patch.name = String(updates.name).trim();
+  if (updates.description !== undefined) patch.description = String(updates.description).trim();
+  store.agencyProjects[idx] = { ...store.agencyProjects[idx], ...patch, updatedAt: now() };
+  // Keep lead.project string in sync when renamed
+  if (patch.name) {
+    store.leads.forEach((l) => {
+      if (l.projectId === id) l.project = patch.name;
+    });
+  }
+  saveStore(store);
+  return enrichProject(store.agencyProjects[idx]);
+}
+
+export function deleteAgencyProject(id) {
+  const store = loadStore();
+  const removed = (store.agencyProjects || []).find((p) => p.id === id);
+  if (!removed) return null;
+  store.agencyProjects = store.agencyProjects.filter((p) => p.id !== id);
+  store.leads.forEach((l) => {
+    if (l.projectId === id) { l.projectId = null; l.project = null; }
+  });
+  saveStore(store);
+  return removed;
+}
+
+export function assignLeadsToProject(projectId, leadIds = []) {
+  const project = (loadStore().agencyProjects || []).find((p) => p.id === projectId);
+  if (!project) throw new Error('Project not found');
+  const updated = [];
+  for (const lid of leadIds) {
+    const lead = updateLead(lid, { projectId, project: project.name });
+    if (lead) updated.push(lead);
+  }
+  return { project: enrichProject(project), leads: updated };
+}

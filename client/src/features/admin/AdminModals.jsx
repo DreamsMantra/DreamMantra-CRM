@@ -6,6 +6,7 @@ import CredentialsModal from '../../components/CredentialsModal';
 import { PartnerDetailModal } from '../../components/admin/AdminTools';
 import { PARTNER_TYPES, PARTNER_TIERS, LEAD_STATUSES, AGENCY_INVESTMENT_TIERS, AGENCY_OPERATING_MODELS } from '../../utils/constants';
 import { leadDisplayName, leadDisplayPhone } from '../../config/adminTabs';
+import JourneyTimeline from '../../components/JourneyTimeline';
 import { suggestLoginId } from './constants';
 import { api } from '../../api';
 
@@ -197,6 +198,13 @@ export default function AdminModals({
             </div>
             <div><label className="dm-label">Status Note</label><input className="dm-input" value={leadUpdate.note} onChange={(e) => setLeadUpdate({ ...leadUpdate, note: e.target.value })} /></div>
             <div><label className="dm-label">Admin Notes (partner sees)</label><textarea className="dm-input" value={leadUpdate.adminNotes} onChange={(e) => setLeadUpdate({ ...leadUpdate, adminNotes: e.target.value })} /></div>
+
+            <details className="rounded-xl border border-stone-200 p-4" open>
+              <summary className="cursor-pointer font-semibold text-stone-800">Journey tracking</summary>
+              <div className="mt-3">
+                <JourneyTimeline lead={selectedLead} />
+              </div>
+            </details>
 
             <details className="rounded-xl border border-stone-200 p-4" open>
               <summary className="cursor-pointer font-semibold text-stone-800">Product rates for this lead</summary>

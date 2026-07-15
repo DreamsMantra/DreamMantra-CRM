@@ -1174,4 +1174,82 @@ router.get('/enterprise', superAdminOnly, (_req, res) => {
   res.json({ stats: db.getEnterpriseDashboard() });
 });
 
+// ─── Partner activity log ───
+router.get('/partners/:id/activities', (req, res) => {
+  const partner = db.findUser({ id: req.params.id });
+  if (!partner || partner.role !== 'partner') return res.status(404).json({ message: 'Partner not found' });
+  res.json({ activities: db.getPartnerActivities(req.params.id) });
+});
+
+router.post('/partners/:id/activities', (req, res) => {
+  const partner = db.findUser({ id: req.params.id });
+  if (!partner || partner.role !== 'partner') return res.status(404).json({ message: 'Partner not found' });
+  const { type, comment, at } = req.body;
+  if (!comment?.trim()) return res.status(400).json({ message: 'comment required' });
+  const activity = db.createPartnerActivity({
+    partnerId: req.params.id,
+    type: type || 'note',
+    comment,
+    at,
+    createdBy: req.user.id,
+    createdByName: req.user.name,
+    createdByRole: req.user.role,
+  });
+  res.status(201).json({ activity });
+});
+
+router.patch('/partner-activities/:id', (req, res) => {
+  const updated = db.updatePartnerActivity(req.params.id, req.body);
+  if (!updated) return res.status(404).json({ message: 'Not found' });
+  res.json({ activity: updated });
+});
+
+router.delete('/partner-activities/:id', (req, res) => {
+  const removed = db.deletePartnerActivity(req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Not found' });
+  res.json({ ok: true });
+});
+
+// ─── Agency projects ───
+router.get('/partners/:id/projects', (req, res) => {
+  const partner = db.findUser({ id: req.params.id });
+  if (!partner || partner.role !== 'partner') return res.status(404).json({ message: 'Partner not found' });
+  res.json({ projects: db.getAgencyProjects(req.params.id).map((p) => db.enrichProject(p)) });
+});
+
+router.post('/partners/:id/projects', (req, res) => {
+  const partner = db.findUser({ id: req.params.id });
+  if (!partner || partner.role !== 'partner') return res.status(404).json({ message: 'Partner not found' });
+  if (!req.body.name?.trim()) return res.status(400).json({ message: 'name required' });
+  const project = db.createAgencyProject({
+    partnerId: req.params.id,
+    name: req.body.name,
+    description: req.body.description,
+    createdBy: req.user.id,
+    createdByName: req.user.name,
+  });
+  res.status(201).json({ project });
+});
+
+router.patch('/agency-projects/:id', (req, res) => {
+  const project = db.updateAgencyProject(req.params.id, req.body);
+  if (!project) return res.status(404).json({ message: 'Not found' });
+  res.json({ project });
+});
+
+router.delete('/agency-projects/:id', (req, res) => {
+  const removed = db.deleteAgencyProject(req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Not found' });
+  res.json({ ok: true });
+});
+
+router.post('/agency-projects/:id/assign-leads', (req, res) => {
+  try {
+    const result = db.assignLeadsToProject(req.params.id, req.body.leadIds || []);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 export default router;

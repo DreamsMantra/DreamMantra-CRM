@@ -288,7 +288,7 @@ export default function AdminDashboard() {
   };
 
   const viewPartnerDetail = async (p) => {
-    setParams({ tab: 'partners', partnerId: p.id });
+    setParams({ tab: 'partners', partnerId: p.id, inner: 'overview' });
   };
 
   const closePartnerProfile = () => {
@@ -447,6 +447,8 @@ export default function AdminDashboard() {
           flash={flash}
           fail={fail}
           resetPassword={resetPassword}
+          profileTab={innerSub || 'overview'}
+          onProfileTab={(id) => setParams({ tab: 'partners', partnerId: partnerProfileId, inner: id })}
         />
       )}
       {tab === 'partners' && !partnerProfileId && <AdminPartnersPanel {...panelProps} />}

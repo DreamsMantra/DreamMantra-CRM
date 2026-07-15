@@ -311,6 +311,48 @@ router.get('/resources', activePartnerOnly, (req, res) => {
   res.json({ resources: db.getResourcesForPartner(req.user.id, category || undefined) });
 });
 
+// Agency projects (partner portal)
+router.get('/projects', activePartnerOnly, (req, res) => {
+  res.json({ projects: db.getAgencyProjects(req.user.id).map((p) => db.enrichProject(p)) });
+});
+
+router.post('/projects', activePartnerOnly, (req, res) => {
+  if (!req.body.name?.trim()) return res.status(400).json({ message: 'name required' });
+  const project = db.createAgencyProject({
+    partnerId: req.user.id,
+    name: req.body.name,
+    description: req.body.description,
+    createdBy: req.user.id,
+    createdByName: req.user.name,
+  });
+  res.status(201).json({ project });
+});
+
+router.patch('/projects/:id', activePartnerOnly, (req, res) => {
+  const existing = db.getAgencyProjects(req.user.id).find((p) => p.id === req.params.id);
+  if (!existing) return res.status(404).json({ message: 'Not found' });
+  const project = db.updateAgencyProject(req.params.id, req.body);
+  res.json({ project });
+});
+
+router.delete('/projects/:id', activePartnerOnly, (req, res) => {
+  const existing = db.getAgencyProjects(req.user.id).find((p) => p.id === req.params.id);
+  if (!existing) return res.status(404).json({ message: 'Not found' });
+  db.deleteAgencyProject(req.params.id);
+  res.json({ ok: true });
+});
+
+router.post('/projects/:id/assign-leads', activePartnerOnly, (req, res) => {
+  try {
+    const existing = db.getAgencyProjects(req.user.id).find((p) => p.id === req.params.id);
+    if (!existing) return res.status(404).json({ message: 'Not found' });
+    const result = db.assignLeadsToProject(req.params.id, req.body.leadIds || []);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 function getTopInterests(leads) {
   const counts = {};
   leads.forEach((l) => (l.interestedIn || []).forEach((i) => { counts[i] = (counts[i] || 0) + 1; }));

@@ -29,6 +29,8 @@ export const defaultStore = {
   automations: [],
   auditLog: [],
   teamMembers: [],
+  partnerActivities: [],
+  agencyProjects: [],
   settings: {
     companyName: 'Dream Mantra',
     supportEmail: 'info@dreammantra.in',
@@ -92,6 +94,8 @@ function normalizeStore(store) {
   if (!normalized.automations) normalized.automations = [];
   if (!normalized.auditLog) normalized.auditLog = [];
   if (!normalized.teamMembers) normalized.teamMembers = [];
+  if (!normalized.partnerActivities) normalized.partnerActivities = [];
+  if (!normalized.agencyProjects) normalized.agencyProjects = [];
   if (!normalized.calendarNotes) normalized.calendarNotes = [];
   if (!normalized.settings) normalized.settings = { ...defaultStore.settings };
   if (!normalized.settings.customForms) normalized.settings.customForms = [];
