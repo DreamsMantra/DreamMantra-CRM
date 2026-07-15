@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, ClipboardList, IndianRupee, BarChart3, Settings,
-  UsersRound, Shield, Building2, Briefcase, Calendar, MessageSquare, Wrench, Database,
+  UsersRound, Shield, Building2, Briefcase, Calendar, MessageSquare, Wrench,
 } from 'lucide-react';
 
 /** Flat sidebar — every section visible, no hidden menus */
@@ -13,8 +13,7 @@ export const SUPER_ADMIN_NAV = [
   { tab: 'reports', label: 'Reports', icon: BarChart3 },
   { tab: 'team', label: 'Team', icon: Shield },
   { tab: 'messages', label: 'Messages', icon: MessageSquare },
-  { tab: 'tools', label: 'Tools', icon: Wrench },
-  { tab: 'data', label: 'Data', icon: Database },
+  { tab: 'tools', label: 'Tools & Data', icon: Wrench },
   { tab: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -26,8 +25,7 @@ export const ADMIN_OPS_NAV = [
   { tab: 'finance', label: 'Money', icon: IndianRupee },
   { tab: 'reports', label: 'Reports', icon: BarChart3 },
   { tab: 'messages', label: 'Messages', icon: MessageSquare },
-  { tab: 'tools', label: 'Tools', icon: Wrench },
-  { tab: 'data', label: 'Data', icon: Database },
+  { tab: 'tools', label: 'Tools & Data', icon: Wrench },
   { tab: 'settings', label: 'Settings', icon: Settings },
 ];
 

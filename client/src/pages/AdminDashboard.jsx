@@ -22,7 +22,6 @@ import ChatMessenger from '../components/ChatMessenger';
 import { playDuplicateBuzz } from '../utils/duplicateBuzz';
 
 const AdminToolsPanel = lazy(() => import('../features/admin/panels/AdminToolsPanel'));
-const AdminDataPanel = lazy(() => import('../features/admin/panels/AdminDataPanel'));
 
 function PanelFallback() {
   return (
@@ -189,12 +188,12 @@ export default function AdminDashboard() {
       const tasks = [];
 
       // Keep badge counts fresh without reloading heavy lists on every tab
-      if (forceAll || ['overview', 'leads', 'partners', 'students', 'finance', 'reports', 'tools', 'data'].includes(tab)) {
+      if (forceAll || ['overview', 'leads', 'partners', 'students', 'finance', 'reports', 'tools'].includes(tab)) {
         tasks.push(safe(() => api.admin.dashboard(), null).then((d) => { if (d) setDashboard(d); }));
         tasks.push(safe(() => api.admin.followUps(), { overdue: [], upcoming: [], today: [] }).then(setFollowUps));
       }
 
-      if (forceAll || ['partners', 'leads', 'finance', 'team', 'tools', 'data', 'students', 'messages'].includes(tab)) {
+      if (forceAll || ['partners', 'leads', 'finance', 'team', 'tools', 'students', 'messages'].includes(tab)) {
         const partnerParams = { status: tab === 'partners' ? partnerFilter : 'all', partnerType: tab === 'partners' ? partnerTypeFilter : 'all' };
         if (tab === 'partners' && searchQuery) partnerParams.search = searchQuery;
         tasks.push(safe(() => api.admin.partners(partnerParams), { partners: [] })
@@ -449,11 +448,6 @@ export default function AdminDashboard() {
       {tab === 'tools' && (
         <Suspense fallback={<PanelFallback />}>
           <AdminToolsPanel {...panelProps} />
-        </Suspense>
-      )}
-      {tab === 'data' && (
-        <Suspense fallback={<PanelFallback />}>
-          <AdminDataPanel {...panelProps} />
         </Suspense>
       )}
       {tab === 'settings' && <AdminSettingsPanel {...panelProps} />}

@@ -88,22 +88,24 @@ export default function DashboardLayout({
     </>
   );
 
-  const Sidebar = () => (
+  const Sidebar = ({ showBrand = true }) => (
     <div className="flex h-full flex-col bg-white">
-      <div className="border-b border-stone-200 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <Logo size="md" to="/" />
-          <button
-            type="button"
-            className="rounded-lg p-2 text-stone-500 hover:bg-stone-100 lg:hidden"
-            onClick={() => setMobileOpen(false)}
-            aria-label="Close menu"
-          >
-            <X className="h-5 w-5" />
-          </button>
+      {showBrand && (
+        <div className="border-b border-stone-200 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <Logo size="md" to="/" />
+            <button
+              type="button"
+              className="rounded-lg p-2 text-stone-500 hover:bg-stone-100 lg:hidden"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <p className="mt-2 text-xs font-medium text-stone-400 lg:hidden">{title}</p>
         </div>
-        <p className="mt-2 text-xs font-medium text-stone-400">{title}</p>
-      </div>
+      )}
       <nav className="flex-1 space-y-0.5 overflow-y-auto overscroll-contain p-3">
         <NavItems compact />
       </nav>
@@ -131,7 +133,7 @@ export default function DashboardLayout({
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} aria-hidden />
           <aside className="absolute left-0 top-0 h-full w-[min(100%,20rem)] max-w-full shadow-2xl">
-            <Sidebar />
+            <Sidebar showBrand={false} />
           </aside>
         </div>
       )}
@@ -148,7 +150,7 @@ export default function DashboardLayout({
               >
                 {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
-              <div className="hidden min-w-0 shrink border-r border-stone-200 pr-3 md:block">
+              <div className="min-w-0 shrink-0 lg:hidden">
                 <Logo size="sm" to="/" />
               </div>
               <h1 className="truncate font-display text-base font-bold text-stone-900 sm:text-lg lg:text-xl">{title}</h1>

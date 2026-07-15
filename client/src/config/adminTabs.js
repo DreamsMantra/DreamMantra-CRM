@@ -1,6 +1,6 @@
 /** Lead segment: B2C students vs B2B business */
 
-export const ADMIN_TAB_IDS = ['overview', 'leads', 'partners', 'students', 'finance', 'reports', 'team', 'messages', 'tools', 'data', 'settings'];
+export const ADMIN_TAB_IDS = ['overview', 'leads', 'partners', 'students', 'finance', 'reports', 'team', 'messages', 'tools', 'settings'];
 
 export const LEAD_TYPES = [
 
@@ -112,13 +112,13 @@ export const ADMIN_TAB_ALIASES = {
 
   master: { tab: 'tools' },
 
-  data: { tab: 'data' },
+  data: { tab: 'tools' },
 
   tools: { tab: 'tools' },
 
   automations: { tab: 'tools' },
 
-  audit: { tab: 'data' },
+  audit: { tab: 'tools' },
 
   notify: { tab: 'settings', inner: 'general' },
 
@@ -188,9 +188,7 @@ export const PAGE_TITLES = {
 
   messages: { title: 'Messages', desc: 'Chat with partners and team' },
 
-  tools: { title: 'Tools', desc: 'Forms, bulk import, resources and automations' },
-
-  data: { title: 'Data', desc: 'Import, export, backups and audit log' },
+  tools: { title: 'Tools & Data', desc: 'Forms, import/export, resources, automations and audit log' },
 
   settings: { title: 'Settings', desc: 'CRM configuration and pricing' },
 
