@@ -1,12 +1,17 @@
+import { useState } from 'react';
 import Modal from '../../components/Modal';
 import LeadForm from '../../components/LeadForm';
 import LeadComments from '../../components/LeadComments';
 import CredentialsModal from '../../components/CredentialsModal';
 import { PartnerDetailModal } from '../../components/admin/AdminTools';
 import { PARTNER_TYPES, PARTNER_TIERS, LEAD_STATUSES, AGENCY_INVESTMENT_TIERS, AGENCY_OPERATING_MODELS } from '../../utils/constants';
-import { leadDisplayName } from '../../config/adminTabs';
+import { leadDisplayName, leadDisplayPhone } from '../../config/adminTabs';
 import { suggestLoginId } from './constants';
 import { api } from '../../api';
+
+function normalizePhone(p) {
+  return String(p || '').replace(/\D/g, '').slice(-10);
+}
 
 export default function AdminModals({
   viewPartner,
@@ -49,6 +54,43 @@ export default function AdminModals({
   editCommission,
   setEditCommission,
 }) {
+  const [adminDupWarn, setAdminDupWarn] = useState(null);
+
+  const findLocalPhoneDupes = (form) => {
+    const phone = normalizePhone(form.leadType === 'business' ? form.contactPhone : form.studentPhone);
+    if (phone.length < 10) return [];
+    return (leads || []).filter((l) => {
+      const lp = normalizePhone(leadDisplayPhone(l) === '—' ? (l.studentPhone || l.contactPhone) : leadDisplayPhone(l));
+      return lp && lp === phone;
+    });
+  };
+
+  const handleAdminCreateLead = async (e) => {
+    e.preventDefault();
+    if (!adminLeadForm.partnerId) {
+      fail(new Error('Select a partner'));
+      return;
+    }
+    const dupes = findLocalPhoneDupes(adminLeadForm);
+    const sameWarn = adminDupWarn?.length
+      && dupes.length
+      && adminDupWarn.map((d) => d.leadId).join() === dupes.map((d) => d.leadId).join();
+    if (dupes.length && !sameWarn) {
+      setAdminDupWarn(dupes);
+      fail(new Error(`Possible duplicate phone — matches ${dupes.map((d) => d.leadId).join(', ')}. Submit again to create anyway.`));
+      return;
+    }
+    try {
+      await api.admin.createLead(adminLeadForm);
+      setAdminDupWarn(null);
+      setLeadModal(false);
+      flash('Lead created');
+      load();
+    } catch (err) {
+      if (err.data?.duplicates) setAdminDupWarn(err.data.duplicates);
+      fail(err);
+    }
+  };
   return (
     <>
       {/* ─── MODALS ─── */}
@@ -113,7 +155,7 @@ export default function AdminModals({
                 ...partnerForm,
                 partnerType: type,
                 loginId: !editingPartner ? suggestLoginId(type) : partnerForm.loginId,
-                ...(type === 'agency' ? { commissionRate: 15, tier: 'gold', royaltyPercent: 8 } : {}),
+                ...(type === 'agency' ? { commissionRate: 15, tier: 'gold' } : {}),
               });
             }}>{PARTNER_TYPES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select></div>
             <div><label className="dm-label">Tier</label><select className="dm-input" value={partnerForm.tier} onChange={(e) => setPartnerForm({ ...partnerForm, tier: e.target.value })}>{PARTNER_TIERS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
@@ -127,7 +169,6 @@ export default function AdminModals({
                 <div><label className="dm-label">Centres</label><input type="number" min={1} className="dm-input" value={partnerForm.outletCount} onChange={(e) => setPartnerForm({ ...partnerForm, outletCount: Number(e.target.value) })} /></div>
                 <div><label className="dm-label">Investment Tier</label><select className="dm-input" value={partnerForm.investmentTier} onChange={(e) => setPartnerForm({ ...partnerForm, investmentTier: e.target.value })}>{AGENCY_INVESTMENT_TIERS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
                 <div><label className="dm-label">Operating Model</label><select className="dm-input" value={partnerForm.operatingModel} onChange={(e) => setPartnerForm({ ...partnerForm, operatingModel: e.target.value })}>{AGENCY_OPERATING_MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></div>
-                <div><label className="dm-label">Royalty %</label><input type="number" className="dm-input" value={partnerForm.royaltyPercent} onChange={(e) => setPartnerForm({ ...partnerForm, royaltyPercent: Number(e.target.value) })} /></div>
                 <div><label className="dm-label">Agreement Date</label><input type="date" className="dm-input" value={partnerForm.agreementDate} onChange={(e) => setPartnerForm({ ...partnerForm, agreementDate: e.target.value })} /></div>
               </>
             )}
@@ -137,7 +178,7 @@ export default function AdminModals({
         </form>
       </Modal>
 
-      <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Lead ${selectedLead?.leadId}`} wide>
+      <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Dreamz ID ${selectedLead?.leadId}`} wide>
         {selectedLead && (
           <div className="space-y-5">
             <div className="flex flex-wrap gap-2">
@@ -191,18 +232,33 @@ export default function AdminModals({
         )}
       </Modal>
 
-      <Modal open={leadModal} onClose={() => setLeadModal(false)} title="Add Lead" wide>
+      <Modal open={leadModal} onClose={() => { setLeadModal(false); setAdminDupWarn(null); }} title="Add Lead" wide>
+        {adminDupWarn?.length > 0 && (
+          <div className="mb-4 rounded-xl border-2 border-amber-500 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <p className="font-semibold text-amber-900">Possible duplicate phone</p>
+            <p className="mt-1 text-amber-800">
+              {adminDupWarn.map((d) => `${leadDisplayName(d) || d.studentName} (${d.leadId})`).join(', ')}
+            </p>
+          </div>
+        )}
         <select className="dm-input mb-4" value={adminLeadForm.partnerId} onChange={(e) => setAdminLeadForm({ ...adminLeadForm, partnerId: e.target.value })} required>
           <option value="">Select partner *</option>
           {partners.filter((p) => p.status === 'active').map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <LeadForm quick form={adminLeadForm} onChange={setAdminLeadForm} templateFields={leadTemplateFields} submitLabel="Create Lead" onSubmit={async (e) => { e.preventDefault(); if (!adminLeadForm.partnerId) { fail(new Error('Select a partner')); return; } await api.admin.createLead(adminLeadForm); setLeadModal(false); flash('Lead created'); load(); }} />
+        <LeadForm
+          quick
+          form={adminLeadForm}
+          onChange={(f) => { setAdminLeadForm(f); setAdminDupWarn(null); }}
+          templateFields={leadTemplateFields}
+          submitLabel="Create Lead"
+          onSubmit={handleAdminCreateLead}
+        />
       </Modal>
 
       <Modal open={commissionModal} onClose={() => setCommissionModal(false)} title="Add Manual Commission">
         <form onSubmit={async (e) => { e.preventDefault(); await api.admin.createCommission(commissionForm); setCommissionModal(false); flash('Commission added'); load(); }} className="space-y-4">
           <div><label className="dm-label">Partner</label><select className="dm-input" value={commissionForm.partnerId} onChange={(e) => setCommissionForm({ ...commissionForm, partnerId: e.target.value })} required>{partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
-          <div><label className="dm-label">Lead ID (internal)</label><select className="dm-input" value={commissionForm.leadId} onChange={(e) => setCommissionForm({ ...commissionForm, leadId: e.target.value })} required>{leads.map((l) => <option key={l.id || l._id} value={l.id || l._id}>{l.leadId} — {leadDisplayName(l)}</option>)}</select></div>
+          <div><label className="dm-label">Dreamz ID</label><select className="dm-input" value={commissionForm.leadId} onChange={(e) => setCommissionForm({ ...commissionForm, leadId: e.target.value })} required>{leads.map((l) => <option key={l.id || l._id} value={l.id || l._id}>{l.leadId} — {leadDisplayName(l)}</option>)}</select></div>
           <div><label className="dm-label">Amount ₹</label><input type="number" className="dm-input" value={commissionForm.amount} onChange={(e) => setCommissionForm({ ...commissionForm, amount: e.target.value })} required /></div>
           <div><label className="dm-label">Notes</label><input className="dm-input" value={commissionForm.notes} onChange={(e) => setCommissionForm({ ...commissionForm, notes: e.target.value })} /></div>
           <button type="submit" className="dm-btn-primary w-full">Create Commission</button>

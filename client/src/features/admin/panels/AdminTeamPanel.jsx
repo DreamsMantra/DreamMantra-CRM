@@ -4,11 +4,10 @@ import RolesPermissions from '../../../components/admin/RolesPermissions';
 import LeadAssignments from '../../../components/admin/LeadAssignments';
 import TaskBoard from '../../../components/admin/TaskBoard';
 import CalendarView from '../../../components/admin/CalendarView';
-import ChatMessenger from '../../../components/ChatMessenger';
 import { ADMIN_SUB_TABS } from '../../../config/adminTabs';
 
 export default function AdminTeamPanel({
-  pageInfo, innerSub, setInner, leads, staffUsers, partners, load, openLeadDetail,
+  pageInfo, innerSub, setInner, leads, staffUsers, load, openLeadDetail,
 }) {
   return (
     <DashboardSection
@@ -23,7 +22,6 @@ export default function AdminTeamPanel({
       {innerSub === 'assignments' && <LeadAssignments leads={leads} staffUsers={staffUsers} onRefresh={load} />}
       {innerSub === 'tasks' && <TaskBoard staffUsers={staffUsers} embedded />}
       {innerSub === 'calendar' && <CalendarView onSelectLead={openLeadDetail} leads={leads} embedded />}
-      {innerSub === 'messages' && <ChatMessenger isAdmin partners={partners} onPartnersRefresh={load} />}
     </DashboardSection>
   );
 }

@@ -4,7 +4,7 @@ import * as db from '../lib/db.js';
 import { PARTNER_TYPES } from '../lib/db.js';
 import { LEAD_STATUSES } from '../models/Lead.js';
 import { authRequired, loadUser, adminOnly, superAdminOnly } from '../middleware/auth.js';
-import { STAFF_ROLES, EDITABLE_STAFF_ROLES, getDefaultPermissions, resolveRolePermissions } from '../lib/roles.js';
+import { STAFF_ROLES, resolveRolePermissions } from '../lib/roles.js';
 import { normalizeLeadInput } from '../utils/leadHelpers.js';
 import { generateReferralCode, generateLeadId, notifyUser, partnerTypeLabel, generateLoginId, isValidLoginId, normalizeLoginId, generateAgencyCode } from '../utils/helpers.js';
 
@@ -279,9 +279,17 @@ router.post('/partners/bulk', async (req, res) => {
 });
 
 router.get('/leads', (req, res) => {
-  const { status, partnerId, search, priority, city, leadType } = req.query;
-  let leads = db.getLeads({ status, search, priority, city, leadType });
-  if (partnerId && partnerId !== 'all') leads = leads.filter((l) => l.partnerId === partnerId);
+  const { status, partnerId, agencyId, search, priority, city, leadType, project } = req.query;
+  const leads = db.getLeads({
+    status,
+    search,
+    priority,
+    city,
+    leadType,
+    project,
+    partnerId: partnerId && partnerId !== 'all' ? partnerId : undefined,
+    agencyId: agencyId && agencyId !== 'all' ? agencyId : undefined,
+  });
   res.json({ leads: leads.map(db.populateLead), total: leads.length, page: 1, pages: 1 });
 });
 
@@ -795,9 +803,18 @@ router.post('/leads/:id/comments', (req, res) => {
 });
 
 // ─── Students ───
-router.get('/students', (_req, res) => {
+router.get('/students', (req, res) => {
   db.syncStudentsFromLeads();
-  res.json({ students: db.getStudents() });
+  const { partnerId, agencyId, project, status, search } = req.query;
+  res.json({
+    students: db.getStudents({
+      partnerId,
+      agencyId,
+      project,
+      status,
+      search,
+    }),
+  });
 });
 
 // ─── Staff user management (Super Admin) ───
@@ -844,10 +861,16 @@ router.delete('/users/:id', superAdminOnly, (req, res) => {
 // ─── Roles & permissions ───
 router.get('/roles', superAdminOnly, (_req, res) => {
   const custom = db.getRolePermissions();
+  const customRoles = db.getCustomRoles();
+  const all = db.getAllRolesForAdmin();
   res.json({
-    roles: EDITABLE_STAFF_ROLES,
-    defaults: Object.fromEntries(EDITABLE_STAFF_ROLES.map((r) => [r, getDefaultPermissions(r)])),
-    merged: Object.fromEntries(EDITABLE_STAFF_ROLES.map((r) => [r, resolveRolePermissions(r, custom)])),
+    roles: all.roles,
+    builtin: all.builtin,
+    customRoles,
+    defaults: all.defaults,
+    merged: Object.fromEntries(
+      all.roles.map((r) => [r, resolveRolePermissions(r, custom, customRoles)])
+    ),
     custom,
   });
 });
@@ -859,6 +882,39 @@ router.put('/roles', superAdminOnly, (req, res) => {
   res.json({ rolePermissions: perms });
 });
 
+router.post('/roles/custom', superAdminOnly, (req, res) => {
+  try {
+    const { label, permissions, key } = req.body;
+    if (!label) return res.status(400).json({ message: 'label required' });
+    const role = db.createCustomRole({ label, permissions, key });
+    db.logActivity({
+      userId: req.user.id,
+      userName: req.user.name,
+      action: 'custom_role_created',
+      entityType: 'settings',
+      entityId: role.id,
+      details: role.label,
+    });
+    res.status(201).json({ role });
+  } catch (err) {
+    res.status(400).json({ message: err.message || 'Failed to create role' });
+  }
+});
+
+router.delete('/roles/custom/:id', superAdminOnly, (req, res) => {
+  const removed = db.deleteCustomRole(req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Custom role not found' });
+  db.logActivity({
+    userId: req.user.id,
+    userName: req.user.name,
+    action: 'custom_role_deleted',
+    entityType: 'settings',
+    entityId: removed.id,
+    details: removed.label,
+  });
+  res.json({ ok: true, role: removed });
+});
+
 // ─── Products & pricing ───
 router.get('/products', (req, res) => {
   res.json({ products: db.getProducts() });
@@ -868,6 +924,83 @@ router.put('/products', superAdminOnly, (req, res) => {
   const products = db.updateProducts(req.body.products || []);
   db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'products_updated', entityType: 'settings' });
   res.json({ products });
+});
+
+// ─── Product allocations (which partners see which products) ───
+router.get('/product-allocations', (req, res) => {
+  res.json({ allocations: db.getProductAllocations() });
+});
+
+router.put('/product-allocations', superAdminOnly, (req, res) => {
+  const allocations = db.setProductAllocations(req.body.allocations || req.body || []);
+  db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'product_allocations_updated', entityType: 'settings' });
+  res.json({ allocations });
+});
+
+// ─── Rates (list / sale prices) ───
+router.get('/rates', (req, res) => {
+  res.json({ rates: db.getRates(req.query) });
+});
+
+router.post('/rates', superAdminOnly, (req, res) => {
+  const { productId, audience, listPrice, salePrice, partnerId, id } = req.body;
+  if (!productId) return res.status(400).json({ message: 'productId required' });
+  const rate = db.upsertRate({ id, productId, audience, listPrice, salePrice, partnerId });
+  db.logActivity({
+    userId: req.user.id,
+    userName: req.user.name,
+    action: 'rate_upserted',
+    entityType: 'settings',
+    entityId: rate.id,
+  });
+  res.status(id ? 200 : 201).json({ rate });
+});
+
+router.delete('/rates/:id', superAdminOnly, (req, res) => {
+  const removed = db.deleteRate(req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Rate not found' });
+  db.logActivity({
+    userId: req.user.id,
+    userName: req.user.name,
+    action: 'rate_deleted',
+    entityType: 'settings',
+    entityId: req.params.id,
+  });
+  res.json({ ok: true });
+});
+
+// ─── Partner resources (training / marketing / product) ───
+router.get('/partner-resources', (req, res) => {
+  const { partnerId, category } = req.query;
+  res.json({ resources: db.getPartnerResources(partnerId, category) });
+});
+
+router.post('/partner-resources', superAdminOnly, (req, res) => {
+  const { partnerId, category, title, type, url } = req.body;
+  if (!title || !url) return res.status(400).json({ message: 'title and url required' });
+  const resource = db.addPartnerResource({ partnerId, category, title, type, url });
+  db.logActivity({
+    userId: req.user.id,
+    userName: req.user.name,
+    action: 'partner_resource_added',
+    entityType: 'settings',
+    entityId: resource.id,
+    details: title,
+  });
+  res.status(201).json({ resource });
+});
+
+router.delete('/partner-resources/:id', superAdminOnly, (req, res) => {
+  const removed = db.deletePartnerResource(req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Resource not found' });
+  db.logActivity({
+    userId: req.user.id,
+    userName: req.user.name,
+    action: 'partner_resource_deleted',
+    entityType: 'settings',
+    entityId: req.params.id,
+  });
+  res.json({ ok: true });
 });
 
 // ─── Tasks (admin ops) ───

@@ -18,6 +18,8 @@ import AdminFinancePanel, { AdminReportsPanel } from '../features/admin/panels/A
 import AdminTeamPanel from '../features/admin/panels/AdminTeamPanel';
 import AdminSettingsPanel from '../features/admin/panels/AdminSettingsPanel';
 import AdminModals from '../features/admin/AdminModals';
+import ChatMessenger from '../components/ChatMessenger';
+import { playDuplicateBuzz } from '../utils/duplicateBuzz';
 
 export default function AdminDashboard() {
   const { user, token } = useAuth();
@@ -71,6 +73,9 @@ export default function AdminDashboard() {
   const [leadFilter, setLeadFilter] = useState('all');
   const [leadPartnerFilter, setLeadPartnerFilter] = useState('all');
   const [leadPriorityFilter, setLeadPriorityFilter] = useState('all');
+  const [leadDateFrom, setLeadDateFrom] = useState('');
+  const [leadDateTo, setLeadDateTo] = useState('');
+  const [leadAssigneeFilter, setLeadAssigneeFilter] = useState('all');
   const [leadTypeFilter, setLeadTypeFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -110,7 +115,11 @@ export default function AdminDashboard() {
   }, [tab, user?.role]);
 
   const flash = (msg) => { setMessage(msg); setTimeout(() => setMessage(''), 4000); };
-  const fail = (err) => setError(err.message || 'Error');
+  const fail = (err) => {
+    const msg = err?.message || 'Error';
+    if (/duplicate/i.test(msg) || err?.data?.duplicates) playDuplicateBuzz();
+    setError(msg);
+  };
 
   const attentionItems = [];
   if (dashboard?.stats?.pendingPartners > 0) {
@@ -174,7 +183,7 @@ export default function AdminDashboard() {
         tasks.push(safe(() => api.admin.followUps(), { overdue: [], upcoming: [], today: [] }).then(setFollowUps));
       }
 
-      if (forceAll || ['overview', 'partners', 'leads', 'finance', 'team', 'settings', 'students'].includes(tab)) {
+      if (forceAll || ['overview', 'partners', 'leads', 'finance', 'team', 'settings', 'students', 'messages'].includes(tab)) {
         const partnerParams = { status: tab === 'partners' ? partnerFilter : 'all', partnerType: tab === 'partners' ? partnerTypeFilter : 'all' };
         if (tab === 'partners' && searchQuery) partnerParams.search = searchQuery;
         tasks.push(safe(() => api.admin.partners(partnerParams), { partners: [] })
@@ -376,6 +385,8 @@ export default function AdminDashboard() {
     pageInfo, dashboard, activities, duplicates, enterprise, reports, partners, leads, commissions,
     followUps, staffUsers, token, sub, innerSub, leadViewMode, setLeadViewMode, leadsPanel, setLeadsPanel,
     leadTypeFilter, setLeadTypeFilter, leadFilter, setLeadFilter, leadPartnerFilter, setLeadPartnerFilter,
+    leadPriorityFilter, setLeadPriorityFilter, leadDateFrom, setLeadDateFrom, leadDateTo, setLeadDateTo,
+    leadAssigneeFilter, setLeadAssigneeFilter,
     search, setSearch, partnerFilter, setPartnerFilter, partnerTypeFilter, setPartnerTypeFilter,
     selectedPartners, setSelectedPartners, selectedLeads, setSelectedLeads, selectedCommissions, setSelectedCommissions,
     settings, setSettings, notifyForm, setNotifyForm, bulkImportPartner, setBulkImportPartner,
@@ -413,12 +424,17 @@ export default function AdminDashboard() {
       {tab === 'leads' && <AdminLeadsPanel {...panelProps} />}
       {tab === 'students' && (
         <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
-          <StudentsPanel staffUsers={staffUsers} onEditLead={openLeadDetail} embedded />
+          <StudentsPanel staffUsers={staffUsers} partners={partners} onEditLead={openLeadDetail} embedded />
         </DashboardSection>
       )}
       {tab === 'finance' && <AdminFinancePanel {...panelProps} />}
       {tab === 'reports' && <AdminReportsPanel {...panelProps} />}
       {tab === 'team' && <AdminTeamPanel {...panelProps} />}
+      {tab === 'messages' && (
+        <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
+          <ChatMessenger isAdmin partners={partners} onPartnersRefresh={refresh} />
+        </DashboardSection>
+      )}
       {tab === 'settings' && <AdminSettingsPanel {...panelProps} />}
 
       {!ADMIN_TAB_IDS.includes(tab) && (

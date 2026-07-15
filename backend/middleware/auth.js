@@ -8,6 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
 export function signToken(user) {
   const custom = db.getRolePermissions();
+  const customRoles = db.getCustomRoles();
   return jwt.sign(
     {
       id: user.id,
@@ -15,7 +16,7 @@ export function signToken(user) {
       role: user.role,
       name: user.name,
       partnerType: user.partnerType,
-      permissions: resolveRolePermissions(user.role, custom),
+      permissions: resolveRolePermissions(user.role, custom, customRoles),
     },
     JWT_SECRET,
     { expiresIn: '7d' }
@@ -39,9 +40,10 @@ export function loadUser(req, res, next) {
   if (!user) return res.status(401).json({ message: 'User not found' });
   // Attach live role permissions so Roles UI edits apply without re-login
   const custom = db.getRolePermissions();
+  const customRoles = db.getCustomRoles();
   req.user = {
     ...user,
-    permissions: resolveRolePermissions(user.role, custom),
+    permissions: resolveRolePermissions(user.role, custom, customRoles),
   };
   next();
 }
@@ -87,7 +89,8 @@ export function partnerOnly(req, res, next) {
 export function requirePermission(permission) {
   return (req, res, next) => {
     const custom = db.getRolePermissions();
-    if (!userHasPermission(req.user, permission, custom)) {
+    const customRoles = db.getCustomRoles();
+    if (!userHasPermission(req.user, permission, custom, customRoles)) {
       return res.status(403).json({ message: `Permission denied: ${permission}` });
     }
     next();

@@ -58,7 +58,7 @@ export default function FranchiseHub({ onRefresh }) {
           </div>
           <div className="text-right">
             <p className="text-xs font-semibold uppercase text-stone-500">{tier.label}</p>
-            <p className="text-sm text-stone-600">{stats.outletCount} outlet{stats.outletCount > 1 ? 's' : ''} · {stats.royaltyPercent}% royalty</p>
+            <p className="text-sm text-stone-600">{stats.outletCount} outlet{stats.outletCount > 1 ? 's' : ''}</p>
           </div>
         </div>
       </div>

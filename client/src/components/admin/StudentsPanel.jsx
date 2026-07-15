@@ -1,19 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api';
 import StatusBadge from '../StatusBadge';
 import Modal from '../Modal';
 import AdminPageHeader, { EditButton } from './AdminPageHeader';
 import { LEAD_STATUSES } from '../../utils/constants';
 
+const VIEW_MODES = [
+  { id: 'all', label: 'All kids' },
+  { id: 'agency', label: 'By Agency' },
+  { id: 'project', label: 'Project' },
+];
+
 export default function StudentsPanel({
   assignMode = false,
   staffUsers = [],
+  partners = [],
   onEditLead,
   embedded = false,
   apiMode = 'admin',
 }) {
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState('');
+  const [kidsView, setKidsView] = useState('all');
+  const [agencyFilter, setAgencyFilter] = useState('all');
+  const [projectFilter, setProjectFilter] = useState('all');
   const [editModal, setEditModal] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [msg, setMsg] = useState('');
@@ -28,10 +38,33 @@ export default function StudentsPanel({
 
   useEffect(() => { load(); }, [apiMode]);
 
+  const projectOptions = useMemo(() => {
+    const set = new Set();
+    students.forEach((s) => {
+      if (s.project) set.add(String(s.project));
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [students]);
+
+  const agencyPartners = useMemo(
+    () => (partners || []).filter((p) => p.status === 'active' || !p.status),
+    [partners]
+  );
+
   const filtered = students.filter((s) => {
+    if (kidsView === 'agency' && agencyFilter !== 'all' && s.partnerId !== agencyFilter) return false;
+    if (kidsView === 'project') {
+      if (projectFilter === 'all') {
+        /* show all when no specific project picked */
+      } else if ((s.project || '') !== projectFilter) return false;
+    }
     if (!search) return true;
     const q = search.toLowerCase();
-    return (s.studentName || '').toLowerCase().includes(q) || (s.mobile || '').includes(q) || (s.leadId || '').toLowerCase().includes(q);
+    return (s.studentName || '').toLowerCase().includes(q)
+      || (s.mobile || '').includes(q)
+      || (s.leadId || '').toLowerCase().includes(q)
+      || (s.project || '').toLowerCase().includes(q)
+      || (s.partnerName || '').toLowerCase().includes(q);
   });
 
   const openEdit = (s) => {
@@ -98,13 +131,44 @@ export default function StudentsPanel({
       {!embedded && <AdminPageHeader title="Students" subtitle={`${students.length} students in pipeline`} onRefresh={load} />}
       {msg && <p className="text-sm text-emerald-600">{msg}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <input className="dm-input max-w-md" placeholder="Search name, mobile, lead ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
+
+      <div className="flex flex-wrap items-center gap-2">
+        {VIEW_MODES.map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            onClick={() => setKidsView(v.id)}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium ${kidsView === v.id ? 'bg-orange text-white' : 'bg-stone-100 text-stone-600'}`}
+          >
+            {v.label}
+          </button>
+        ))}
+        {kidsView === 'agency' && (
+          <select className="dm-input w-auto min-w-[180px]" value={agencyFilter} onChange={(e) => setAgencyFilter(e.target.value)}>
+            <option value="all">All agencies / partners</option>
+            {agencyPartners.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
+        {kidsView === 'project' && (
+          <select className="dm-input w-auto min-w-[160px]" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+            <option value="all">All projects</option>
+            {projectOptions.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <input className="dm-input max-w-md" placeholder="Search name, mobile, Dreamz ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
 
       <div className="dm-card overflow-x-auto">
         <table className="dm-table w-full">
           <thead>
             <tr>
-              <th>Lead ID</th><th>Student</th><th>Parent</th><th>Mobile</th><th>Class</th><th>School</th><th>Product</th><th>Status</th>
+              <th>Dreamz ID</th><th>Student</th><th>Parent</th><th>Mobile</th><th>Class</th><th>School</th>
+              <th>Project</th><th>Partner</th><th>Product</th><th>Status</th>
               {assignMode && <th>Assign Sales</th>}
               <th>Actions</th>
             </tr>
@@ -118,6 +182,8 @@ export default function StudentsPanel({
                 <td>{s.mobile}</td>
                 <td>{s.classGrade || '—'}</td>
                 <td>{s.school || '—'}</td>
+                <td className="text-xs">{s.project || '—'}</td>
+                <td className="text-xs">{s.partnerName || '—'}</td>
                 <td className="text-xs">{(s.products || []).join(', ') || '—'}</td>
                 <td><StatusBadge status={s.status} /></td>
                 {assignMode && (

@@ -1,45 +1,32 @@
-import { motion } from 'framer-motion';
+﻿import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
-  Users, School, GraduationCap, BookOpen, TrendingUp, Shield,
-  BarChart3, Bell, IndianRupee, ClipboardList, ArrowRight, Star, HelpCircle,
-  Upload, Trophy, MessageCircle, Calendar, Store, MapPin, Target,
+  Users, School, GraduationCap, BookOpen,
+  ArrowRight, HelpCircle,
+  Store, MapPin, Target, BarChart3,
 } from 'lucide-react';
 import PublicNavbar from '../components/PublicNavbar';
 import CompanyInfoSection, { CompanyFooter } from '../components/CompanyInfoSection';
-
-const features = [
-  { icon: ClipboardList, title: 'Lead Submission', desc: 'Rich student forms with class, interests, budget, contact preferences & duplicate detection.' },
-  { icon: Upload, title: 'Bulk CSV Import', desc: 'Import dozens of student leads at once from spreadsheet data.' },
-  { icon: TrendingUp, title: '8-Stage Pipeline', desc: 'New → Contacted → Interested → Counselling → Assessment → Converted.' },
-  { icon: IndianRupee, title: 'Commission System', desc: 'Auto commission on conversion, approve & payout tracking with bank/UPI details.' },
-  { icon: BarChart3, title: 'Analytics & Reports', desc: 'Monthly trends, conversion funnel, partner performance & revenue pipeline.' },
-  { icon: Bell, title: 'Real-time Notifications', desc: 'Instant alerts on status changes, commissions, and admin announcements.' },
-  { icon: Trophy, title: 'Partner Leaderboard', desc: 'Bronze to Platinum tiers with rankings and conversion rate tracking.' },
-  { icon: Calendar, title: 'Follow-up Reminders', desc: 'Never miss a callback — overdue and upcoming follow-up dashboard.' },
-  { icon: MessageCircle, title: 'Lead Comments', desc: 'Two-way communication between admin and partners on each lead.' },
-  { icon: Shield, title: 'Secure & Role-based', desc: 'JWT auth, password management, and separate admin/partner portals.' },
-];
 
 const partnerTypes = [
   { icon: School, title: 'Schools', desc: 'Refer students for career counselling & assessments' },
   { icon: GraduationCap, title: 'Colleges', desc: 'Connect students to Dream Mantra programs' },
   { icon: BookOpen, title: 'Coaching Centers', desc: 'Partner for DMIT, psychometric & skill mapping' },
   { icon: Users, title: 'Teachers', desc: 'Individual educators referring motivated students' },
-  { icon: Store, title: 'Agency Partners', desc: 'Own a Dream Mantra centre with territory rights, marketing kit & revenue share' },
+  { icon: Store, title: 'Agency Partners', desc: 'Own a Dream Mantra centre with territory rights, marketing kit & growth support' },
 ];
 
 const agencyFeatures = [
   { icon: MapPin, title: 'Exclusive Territory', desc: 'Operate in your city/region with protected agency rights and branded centre support.' },
   { icon: Target, title: 'Lead Targets & KPIs', desc: 'Monthly lead goals, conversion tracking, and performance dashboards built for agency growth.' },
-  { icon: Store, title: 'Multi-Centre Model', desc: 'Scale from single centre to master agency with outlet tracking and royalty management.' },
-  { icon: IndianRupee, title: 'Higher Commission', desc: 'Premium 15% commission tier, royalty transparency, and faster payout cycles for agency partners.' },
+  { icon: Store, title: 'Multi-Centre Model', desc: 'Scale from single centre to master agency with outlet tracking and operations support.' },
+  { icon: BarChart3, title: 'Agency Hub', desc: 'Dedicated CRM workspace with onboarding checklists, marketing kits, and centre performance views.' },
 ];
 
 const faqs = [
   { q: 'How do I apply for an agency?', a: 'Click "Apply for Agency" on the homepage, fill in your territory and investment details, and our team will review your application within 48 hours.' },
   { q: 'How do I become a partner?', a: 'Register on our portal, fill in your organization details, and wait for admin approval (usually 24-48 hours).' },
-  { q: 'When do I earn commission?', a: 'Commission is auto-generated when a lead you referred is marked as "Converted" by our counsellors.' },
+  { q: 'When do conversions show on my dashboard?', a: 'When a student you referred completes counselling and is marked completed by our team, your dashboard updates automatically.' },
   { q: 'Can I import leads in bulk?', a: 'Yes! Use the Bulk Import feature to paste CSV data with student name, phone, class, and city.' },
   { q: 'How do I track my leads?', a: 'Your dashboard shows real-time status updates, timeline history, and admin notes for every lead.' },
 ];
@@ -57,7 +44,7 @@ export default function Home() {
         <div className="relative mx-auto max-w-7xl text-center">
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}>
             <span className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-white px-4 py-1.5 text-sm font-semibold text-gold-dark shadow-sm">
-              ✨ Dream Mantra Partner CRM — Now with Advanced Features
+              Dream Mantra Partner CRM
             </span>
             <h1 className="mt-6 font-display text-4xl font-bold leading-tight text-stone-900 md:text-6xl">
               Grow Together with{' '}
@@ -65,7 +52,7 @@ export default function Home() {
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-stone-600">
               Complete lead management for schools, colleges, coaching centers, teachers & agency partners.
-              Submit leads, track counselling, earn commissions — all in one powerful portal.
+              Submit leads, track counselling, and grow with Dream Mantra — all in one portal.
             </p>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
               <Link to="/signup" className="dm-btn-primary px-8 py-3 text-base">
@@ -78,10 +65,10 @@ export default function Home() {
 
           <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mx-auto mt-16 grid max-w-5xl grid-cols-2 gap-4 md:grid-cols-4">
             {[
-              { label: 'CRM Features', value: '20+' },
-              { label: 'Lead Stages', value: '8' },
-              { label: 'Partner Tiers', value: '4' },
-              { label: 'Export & Reports', value: '✓' },
+              { label: 'Partner types', value: '5+' },
+              { label: 'Pipeline stages', value: '8' },
+              { label: 'Partner tiers', value: '4' },
+              { label: 'Export & reports', value: '✓' },
             ].map((s) => (
               <div key={s.label} className="dm-stat-card text-center">
                 <p className="font-display text-2xl font-bold text-gold-dark">{s.value}</p>
@@ -92,23 +79,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="features" className="border-t border-stone-200 bg-white px-4 py-20">
-        <div className="mx-auto max-w-7xl">
-          <h2 className="text-center font-display text-3xl font-bold text-stone-900">Powerful CRM Features</h2>
-          <p className="mx-auto mt-3 max-w-xl text-center text-stone-500">Everything partners and admins need to manage the referral pipeline</p>
-          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {features.map((f, i) => (
-              <motion.div key={f.title} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.03 }} className="dm-card p-6 transition hover:shadow-md">
-                <div className="mb-4 inline-flex rounded-xl bg-orange/10 p-3 text-orange"><f.icon className="h-6 w-6" /></div>
-                <h3 className="font-display text-lg font-bold text-stone-900">{f.title}</h3>
-                <p className="mt-2 text-sm text-stone-500">{f.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="partners" className="px-4 py-20">
+      <section id="partners" className="border-t border-stone-200 bg-white px-4 py-20">
         <div className="mx-auto max-w-7xl">
           <h2 className="text-center font-display text-3xl font-bold text-stone-900">Who Can Partner?</h2>
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
@@ -151,7 +122,7 @@ export default function Home() {
         <div className="mx-auto max-w-3xl">
           <h2 className="text-center font-display text-3xl font-bold text-stone-900">How It Works</h2>
           <ol className="mt-10 space-y-4">
-            {['Register as partner → Get admin approval', 'Submit leads individually or bulk import CSV', 'Track real-time status updates & comments', 'Earn commission on converted students', 'Receive payouts to your bank/UPI'].map((step, i) => (
+            {['Register as partner → Get admin approval', 'Submit leads individually or bulk import CSV', 'Track real-time status updates & comments', 'Follow students through counselling to completion', 'Receive payouts to your bank/UPI'].map((step, i) => (
               <li key={step} className="flex items-start gap-4 dm-card p-4">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold/20 text-sm font-bold text-gold-dark">{i + 1}</span>
                 <span className="pt-1 text-stone-700">{step}</span>
@@ -178,11 +149,9 @@ export default function Home() {
       <CompanyInfoSection />
 
       <section className="border-t border-stone-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-16 text-center">
-        <Star className="mx-auto h-8 w-8 text-gold" />
-        <h2 className="mt-4 font-display text-2xl font-bold text-stone-900">Ready to partner with Dream Mantra?</h2>
-        <Link to="/signup" className="dm-btn-primary mt-6 inline-flex">Start Registration</Link>
+        <h2 className="font-display text-2xl font-bold text-stone-900">Ready to partner with Dream Mantra?</h2>
+        <Link to="/signup" className="dm-btn-primary mt-6 inline-flex px-8 py-3">Get Started</Link>
       </section>
-
       <CompanyFooter />
     </div>
   );

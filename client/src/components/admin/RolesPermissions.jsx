@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pencil, RotateCcw, Shield } from 'lucide-react';
+import { Pencil, Plus, RotateCcw, Shield, Trash2 } from 'lucide-react';
 import { api } from '../../api';
 import { ROLE_LABELS } from '../../config/roleNavigation';
 import AdminPageHeader from './AdminPageHeader';
@@ -19,9 +19,12 @@ const PERMISSION_GROUPS = [
 const ALL_PERMISSIONS = PERMISSION_GROUPS.flatMap((g) => g.keys);
 
 export default function RolesPermissions() {
-  const [data, setData] = useState({ roles: [], defaults: {}, merged: {}, custom: {} });
+  const [data, setData] = useState({ roles: [], defaults: {}, merged: {}, custom: {}, customRoles: [], builtin: [] });
   const [editingRole, setEditingRole] = useState(null);
   const [editPerms, setEditPerms] = useState([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createLabel, setCreateLabel] = useState('');
+  const [createPerms, setCreatePerms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -37,6 +40,8 @@ export default function RolesPermissions() {
         defaults: res.defaults || {},
         merged: res.merged || {},
         custom: res.custom || {},
+        customRoles: res.customRoles || [],
+        builtin: res.builtin || [],
       });
     } catch (err) {
       setError(err.message || 'Failed to load roles. Super Admin access required.');
@@ -47,6 +52,15 @@ export default function RolesPermissions() {
 
   useEffect(() => { load(); }, []);
 
+  const roleLabel = (role) => {
+    const custom = data.customRoles?.find((r) => r.key === role || r.id === role);
+    return custom?.label || ROLE_LABELS[role] || role;
+  };
+
+  const isCustomRole = (role) => data.customRoles?.some((r) => r.key === role || r.id === role);
+
+  const getCustomRoleMeta = (role) => data.customRoles?.find((r) => r.key === role || r.id === role);
+
   const getPerms = (role) => data.merged[role] || data.defaults[role] || [];
 
   const startEdit = (role) => {
@@ -55,13 +69,13 @@ export default function RolesPermissions() {
     setEditPerms(getPerms(role).filter((p) => p !== '*'));
   };
 
-  const togglePerm = (perm) => {
-    setEditPerms((prev) => (prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]));
+  const togglePerm = (perm, setter) => {
+    setter((prev) => (prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]));
   };
 
-  const toggleGroup = (keys) => {
-    const allOn = keys.every((k) => editPerms.includes(k));
-    setEditPerms((prev) => {
+  const toggleGroup = (keys, setter) => {
+    setter((prev) => {
+      const allOn = keys.every((k) => prev.includes(k));
       if (allOn) return prev.filter((p) => !keys.includes(p));
       return Array.from(new Set([...prev, ...keys]));
     });
@@ -80,7 +94,7 @@ export default function RolesPermissions() {
         merged: { ...d.merged, [editingRole]: editPerms },
       }));
       setEditingRole(null);
-      setMsg(`Permissions saved for ${ROLE_LABELS[editingRole] || editingRole}`);
+      setMsg(`Permissions saved for ${roleLabel(editingRole)}`);
       setTimeout(() => setMsg(''), 4000);
       await load();
     } catch (err) {
@@ -91,7 +105,7 @@ export default function RolesPermissions() {
   };
 
   const resetRole = async (role) => {
-    if (!confirm(`Reset ${ROLE_LABELS[role] || role} to default permissions?`)) return;
+    if (!confirm(`Reset ${roleLabel(role)} to default permissions?`)) return;
     setError('');
     try {
       const custom = { ...data.custom };
@@ -106,17 +120,85 @@ export default function RolesPermissions() {
     }
   };
 
+  const createRole = async (e) => {
+    e.preventDefault();
+    if (!createLabel.trim()) {
+      setError('Role label is required');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await api.admin.createCustomRole({ label: createLabel.trim(), permissions: createPerms });
+      setCreateOpen(false);
+      setCreateLabel('');
+      setCreatePerms([]);
+      setMsg('Custom role created');
+      setTimeout(() => setMsg(''), 3000);
+      await load();
+    } catch (err) {
+      setError(err.message || 'Failed to create role');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteCustom = async (role) => {
+    const meta = getCustomRoleMeta(role);
+    if (!meta) return;
+    if (!confirm(`Delete custom role "${meta.label}"? Users with this role may lose access.`)) return;
+    setError('');
+    try {
+      await api.admin.deleteCustomRole(meta.id);
+      setMsg('Custom role deleted');
+      setTimeout(() => setMsg(''), 3000);
+      if (editingRole === meta.key) setEditingRole(null);
+      await load();
+    } catch (err) {
+      setError(err.message || 'Failed to delete role');
+    }
+  };
+
+  const PermissionChecklist = ({ perms, setPerms }) => (
+    <div className="max-h-[55vh] space-y-4 overflow-y-auto pr-1">
+      {PERMISSION_GROUPS.map((group) => {
+        const keys = group.keys.filter((k) => ALL_PERMISSIONS.includes(k));
+        const allOn = keys.every((k) => perms.includes(k));
+        return (
+          <div key={group.title} className="rounded-xl border border-stone-200 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-semibold text-stone-800">{group.title}</p>
+              <button type="button" className="text-xs font-medium text-gold-dark hover:underline" onClick={() => toggleGroup(keys, setPerms)}>
+                {allOn ? 'Clear group' : 'Select all'}
+              </button>
+            </div>
+            <div className="grid gap-1 sm:grid-cols-2">
+              {keys.map((p) => (
+                <label key={p} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-stone-50">
+                  <input type="checkbox" checked={perms.includes(p)} onChange={() => togglePerm(p, setPerms)} />
+                  <span className="font-mono text-stone-700">{p}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   if (loading) return <div className="dm-card p-12 text-center text-stone-400">Loading roles & permissions...</div>;
 
   return (
     <div className="space-y-4">
       <AdminPageHeader
         title="Roles & Permissions"
-        subtitle="Super Admin has full access (*). Click Edit to open the permission editor."
+        subtitle="Super Admin has full access (*). Create custom roles or click Edit to open the permission editor."
         onRefresh={load}
+        onAdd={() => { setError(''); setCreateOpen(true); }}
+        addLabel="Create Role"
       />
       {msg && <p className="text-sm text-emerald-600">{msg}</p>}
-      {error && !editingRole && (
+      {error && !editingRole && !createOpen && (
         <div className="dm-alert-error text-sm">
           {error}
           <button type="button" className="ml-2 underline" onClick={load}>Retry</button>
@@ -130,26 +212,36 @@ export default function RolesPermissions() {
       <div className="grid gap-4 md:grid-cols-2">
         {data.roles?.map((role) => {
           const perms = getPerms(role);
-          const isCustom = Array.isArray(data.custom?.[role]);
+          const hasOverrides = Array.isArray(data.custom?.[role]);
+          const customRole = isCustomRole(role);
           return (
             <div key={role} className="dm-card p-4">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Shield className="h-4 w-4 text-gold-dark" />
-                  <h3 className="font-semibold text-stone-800">{ROLE_LABELS[role] || role}</h3>
-                  {isCustom && role !== 'super_admin' && (
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Custom</span>
+                  <h3 className="font-semibold text-stone-800">{roleLabel(role)}</h3>
+                  {customRole && (
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">Custom role</span>
+                  )}
+                  {hasOverrides && !customRole && role !== 'super_admin' && (
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Customized</span>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {role !== 'super_admin' ? (
                     <>
                       <button type="button" className="dm-btn-primary text-xs" onClick={() => startEdit(role)}>
                         <Pencil className="mr-1 inline h-3 w-3" /> Edit
                       </button>
-                      <button type="button" className="dm-btn-ghost text-xs text-stone-500" onClick={() => resetRole(role)}>
-                        <RotateCcw className="mr-1 inline h-3 w-3" /> Reset
-                      </button>
+                      {customRole ? (
+                        <button type="button" className="dm-btn-ghost text-xs text-red-600" onClick={() => deleteCustom(role)}>
+                          <Trash2 className="mr-1 inline h-3 w-3" /> Delete
+                        </button>
+                      ) : (
+                        <button type="button" className="dm-btn-ghost text-xs text-stone-500" onClick={() => resetRole(role)}>
+                          <RotateCcw className="mr-1 inline h-3 w-3" /> Reset
+                        </button>
+                      )}
                     </>
                   ) : (
                     <span className="dm-badge bg-gold/20 text-gold-dark text-xs">Full Access *</span>
@@ -158,6 +250,7 @@ export default function RolesPermissions() {
               </div>
               <ul className="max-h-36 space-y-1 overflow-y-auto text-sm text-stone-600">
                 {perms.map((p) => <li key={p}>• {p}</li>)}
+                {!perms.length && <li className="text-stone-400">No permissions</li>}
               </ul>
             </div>
           );
@@ -167,7 +260,7 @@ export default function RolesPermissions() {
       <Modal
         open={!!editingRole}
         onClose={() => setEditingRole(null)}
-        title={`Edit: ${ROLE_LABELS[editingRole] || editingRole || ''}`}
+        title={`Edit: ${roleLabel(editingRole) || ''}`}
         wide
       >
         {editingRole && (
@@ -176,39 +269,48 @@ export default function RolesPermissions() {
               Toggle permissions for this role, then save. Changes apply to new sessions for staff with this role.
             </p>
             {error && <div className="dm-alert-error text-sm">{error}</div>}
-            <div className="max-h-[55vh] space-y-4 overflow-y-auto pr-1">
-              {PERMISSION_GROUPS.map((group) => {
-                const keys = group.keys.filter((k) => ALL_PERMISSIONS.includes(k));
-                const allOn = keys.every((k) => editPerms.includes(k));
-                return (
-                  <div key={group.title} className="rounded-xl border border-stone-200 p-3">
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-stone-800">{group.title}</p>
-                      <button type="button" className="text-xs font-medium text-gold-dark hover:underline" onClick={() => toggleGroup(keys)}>
-                        {allOn ? 'Clear group' : 'Select all'}
-                      </button>
-                    </div>
-                    <div className="grid gap-1 sm:grid-cols-2">
-                      {keys.map((p) => (
-                        <label key={p} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-stone-50">
-                          <input type="checkbox" checked={editPerms.includes(p)} onChange={() => togglePerm(p)} />
-                          <span className="font-mono text-stone-700">{p}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <PermissionChecklist perms={editPerms} setPerms={setEditPerms} />
             <div className="flex flex-wrap gap-2 border-t border-stone-100 pt-4">
               <button type="button" className="dm-btn-primary" disabled={saving} onClick={saveRole}>
                 {saving ? 'Saving…' : 'Save Permissions'}
               </button>
               <button type="button" className="dm-btn-ghost" onClick={() => setEditingRole(null)}>Cancel</button>
-              <button type="button" className="dm-btn-ghost text-stone-500" onClick={() => resetRole(editingRole)}>Reset to defaults</button>
+              {!isCustomRole(editingRole) && (
+                <button type="button" className="dm-btn-ghost text-stone-500" onClick={() => resetRole(editingRole)}>Reset to defaults</button>
+              )}
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Create Role"
+        wide
+      >
+        <form onSubmit={createRole} className="space-y-4">
+          <div>
+            <label className="dm-label">Role label</label>
+            <input
+              className="dm-input"
+              value={createLabel}
+              onChange={(e) => setCreateLabel(e.target.value)}
+              placeholder="e.g. Regional Manager"
+              required
+            />
+          </div>
+          <p className="text-sm text-stone-500">Select starting permissions for this role.</p>
+          {error && createOpen && <div className="dm-alert-error text-sm">{error}</div>}
+          <PermissionChecklist perms={createPerms} setPerms={setCreatePerms} />
+          <div className="flex flex-wrap gap-2 border-t border-stone-100 pt-4">
+            <button type="submit" className="dm-btn-primary" disabled={saving}>
+              <Plus className="mr-1 inline h-3 w-3" />
+              {saving ? 'Creating…' : 'Create Role'}
+            </button>
+            <button type="button" className="dm-btn-ghost" onClick={() => setCreateOpen(false)}>Cancel</button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

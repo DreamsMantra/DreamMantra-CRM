@@ -294,6 +294,23 @@ router.post('/payout-request', activePartnerOnly, (req, res) => {
   res.status(201).json({ request });
 });
 
+// ─── Allocated products, rates, resources ───
+router.get('/products', activePartnerOnly, (req, res) => {
+  res.json({ products: db.getAllocatedProductsForPartner(req.user.id) });
+});
+
+router.get('/rates', activePartnerOnly, (req, res) => {
+  res.json({ rates: db.getRatesForPartner(req.user.id) });
+});
+
+router.get('/resources', activePartnerOnly, (req, res) => {
+  const category = req.query.category;
+  if (category && !['training', 'marketing', 'product'].includes(category)) {
+    return res.status(400).json({ message: 'category must be training, marketing, or product' });
+  }
+  res.json({ resources: db.getResourcesForPartner(req.user.id, category || undefined) });
+});
+
 function getTopInterests(leads) {
   const counts = {};
   leads.forEach((l) => (l.interestedIn || []).forEach((i) => { counts[i] = (counts[i] || 0) + 1; }));

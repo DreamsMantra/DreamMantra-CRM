@@ -140,7 +140,7 @@ export default function StaffDashboard() {
         <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
           <div className="dm-card overflow-x-auto">
             <table className="dm-table w-full">
-              <thead><tr><th>ID</th><th>Student</th><th>Mobile</th><th>Product</th><th>Status</th><th>Follow-up</th><th>Update</th></tr></thead>
+              <thead><tr><th>Dreamz ID</th><th>Student</th><th>Mobile</th><th>Product</th><th>Status</th><th>Follow-up</th><th>Update</th></tr></thead>
               <tbody>
                 {leads.map((l) => (
                   <tr key={l.id}>
@@ -235,7 +235,7 @@ export default function StaffDashboard() {
               flash('Session saved');
               load();
             }}>
-              <input className="dm-input" placeholder="Student / Lead ID" value={newSession.studentId} onChange={(e) => setNewSession({ ...newSession, studentId: e.target.value })} required />
+              <input className="dm-input" placeholder="Student / Dreamz ID" value={newSession.studentId} onChange={(e) => setNewSession({ ...newSession, studentId: e.target.value })} required />
               <input type="datetime-local" className="dm-input" value={newSession.scheduledAt} onChange={(e) => setNewSession({ ...newSession, scheduledAt: e.target.value })} />
               <input className="dm-input" placeholder="Counselling notes" value={newSession.notes} onChange={(e) => setNewSession({ ...newSession, notes: e.target.value })} />
               <button type="submit" className="dm-btn-primary md:col-span-3">Save Session</button>
@@ -285,7 +285,7 @@ export default function StaffDashboard() {
         </DashboardSection>
       )}
 
-      <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Update ${selectedLead?.leadId || 'Lead'}`} wide>
+      <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Dreamz ID ${selectedLead?.leadId || ''}`} wide>
         {selectedLead && (
           <form onSubmit={saveLead} className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">

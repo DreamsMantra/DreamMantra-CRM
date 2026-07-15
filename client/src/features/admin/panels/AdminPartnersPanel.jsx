@@ -1,6 +1,9 @@
-import { UserPlus, Search, Store } from 'lucide-react';
+import { useState } from 'react';
+import { UserPlus, Search, Store, FolderOpen } from 'lucide-react';
 import DashboardSection from '../../../components/layout/DashboardSection';
 import { PartnerRowActions, BulkActionBar, SelectCheckbox } from '../../../components/admin/AdminTools';
+import PartnerResourcesAdmin from '../../../components/admin/PartnerResourcesAdmin';
+import Modal from '../../../components/Modal';
 import { PARTNER_TYPES } from '../../../utils/constants';
 import { partnerTypeLabel } from '../../../utils/constants';
 import { api } from '../../../api';
@@ -11,6 +14,9 @@ export default function AdminPartnersPanel({
   onPartnerCreate, viewPartnerDetail, deletePartner, resetPassword, flash,
   setEditingPartner, setPartnerForm, setPartnerModal,
 }) {
+  const [resourcesOpen, setResourcesOpen] = useState(false);
+  const [resourcesPartnerId, setResourcesPartnerId] = useState('all');
+
   const bulkPartners = async (action, data = {}) => {
     await api.admin.bulkPartners(selectedPartners, action, data);
     flash(`${selectedPartners.length} partners updated`);
@@ -18,11 +24,25 @@ export default function AdminPartnersPanel({
     load();
   };
 
+  const openResources = (partnerId = 'all') => {
+    setResourcesPartnerId(partnerId);
+    setResourcesOpen(true);
+  };
+
   return (
     <DashboardSection
       title={pageInfo.title}
       description={pageInfo.desc}
-      actions={<button type="button" onClick={() => onPartnerCreate(false)} className="dm-btn-primary text-sm"><UserPlus className="h-4 w-4" /> Add Partner</button>}
+      actions={(
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => openResources('all')} className="dm-btn-ghost text-sm">
+            <FolderOpen className="h-4 w-4" /> Resources
+          </button>
+          <button type="button" onClick={() => onPartnerCreate(false)} className="dm-btn-primary text-sm">
+            <UserPlus className="h-4 w-4" /> Add Partner
+          </button>
+        </div>
+      )}
     >
       <BulkActionBar selected={selectedPartners} onClear={() => setSelectedPartners([])} actions={[
         { label: 'Approve', onClick: () => bulkPartners('approve') },
@@ -39,6 +59,7 @@ export default function AdminPartnersPanel({
         </select>
         <input className="dm-input min-w-[200px] flex-1" placeholder="Search partners..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <button type="button" onClick={load} className="dm-btn-ghost"><Search className="h-4 w-4" /></button>
+        <button type="button" onClick={() => openResources('all')} className="dm-btn-ghost"><FolderOpen className="h-4 w-4" /> Resources</button>
         <button type="button" onClick={() => onPartnerCreate(false)} className="dm-btn-primary"><UserPlus className="h-4 w-4" /> Add Partner</button>
         <button type="button" onClick={() => onPartnerCreate(true)} className="dm-btn-gold"><Store className="h-4 w-4" /> Add Agency</button>
       </div>
@@ -75,6 +96,7 @@ export default function AdminPartnersPanel({
                     onResetPwd={resetPassword}
                     onRecalc={async (x) => { await api.admin.recalculatePartner(x.id); flash('Stats recalculated'); load(); }}
                   />
+                  <button type="button" onClick={() => openResources(p.id)} className="text-xs text-gold-dark">Resources</button>
                   {p.status === 'pending' && <button type="button" onClick={() => api.admin.updatePartner(p.id, { status: 'active' }).then(load)} className="text-xs text-emerald-600">Approve</button>}
                 </td>
               </tr>
@@ -82,6 +104,14 @@ export default function AdminPartnersPanel({
           </tbody>
         </table>
       </div>
+
+      <Modal open={resourcesOpen} onClose={() => setResourcesOpen(false)} title="Partner Resources" wide>
+        <PartnerResourcesAdmin
+          embedded
+          initialPartnerId={resourcesPartnerId}
+          onClose={() => setResourcesOpen(false)}
+        />
+      </Modal>
     </DashboardSection>
   );
 }

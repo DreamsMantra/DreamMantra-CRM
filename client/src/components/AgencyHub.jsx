@@ -59,7 +59,7 @@ export default function AgencyHub({ onRefresh }) {
           </div>
           <div className="text-right">
             <p className="text-xs font-semibold uppercase text-stone-500">{tier.label}</p>
-            <p className="text-sm text-stone-600">{stats.outletCount} centre{stats.outletCount > 1 ? 's' : ''} · {stats.royaltyPercent}% royalty</p>
+            <p className="text-sm text-stone-600">{stats.outletCount} centre{stats.outletCount > 1 ? 's' : ''}</p>
             {stats.teamSize > 0 && <p className="text-sm text-stone-500 flex items-center justify-end gap-1"><UsersRound className="h-3 w-3" /> {stats.teamSize} team members</p>}
           </div>
         </div>

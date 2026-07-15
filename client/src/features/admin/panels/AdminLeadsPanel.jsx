@@ -9,12 +9,49 @@ import { LEAD_STATUSES, formatDate } from '../../../utils/constants';
 import { leadDisplayName, leadDisplayPhone } from '../../../config/adminTabs';
 import { api } from '../../../api';
 
+const PRIORITIES = ['low', 'medium', 'high'];
+
+function dayStart(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function filterLeadsClient(leads, { dateFrom, dateTo, assignee }) {
+  return (leads || []).filter((l) => {
+    if (dateFrom || dateTo) {
+      const created = dayStart(l.createdAt);
+      if (created == null) return false;
+      if (dateFrom && created < dayStart(dateFrom)) return false;
+      if (dateTo) {
+        const end = dayStart(dateTo);
+        if (end != null && created > end) return false;
+      }
+    }
+    if (assignee && assignee !== 'all') {
+      const id = l.assignedTo || l.assignedSalesId || l.assignedCounsellorId || '';
+      if (id !== assignee) return false;
+    }
+    return true;
+  });
+}
+
 export default function AdminLeadsPanel({
   pageInfo, leads, partners, followUps, duplicates, leadViewMode, setLeadViewMode,
   leadTypeFilter, setLeadTypeFilter, leadsPanel, setLeadsPanel, leadFilter, setLeadFilter,
   leadPartnerFilter, setLeadPartnerFilter, search, setSearch, selectedLeads, setSelectedLeads,
+  leadPriorityFilter, setLeadPriorityFilter, leadDateFrom, setLeadDateFrom, leadDateTo, setLeadDateTo,
+  leadAssigneeFilter, setLeadAssigneeFilter, staffUsers = [],
   load, toggleAll, bulkLeads, openQuickLead, openLeadDetail, flash,
 }) {
+  const displayLeads = filterLeadsClient(leads, {
+    dateFrom: leadDateFrom,
+    dateTo: leadDateTo,
+    assignee: leadAssigneeFilter,
+  });
+
   return (
     <DashboardSection
       title={pageInfo.title}
@@ -55,7 +92,7 @@ export default function AdminLeadsPanel({
       <div className="flex flex-wrap items-center gap-2">
         {['all', 'student', 'business'].map((t) => (
           <button key={t} type="button" onClick={() => setLeadTypeFilter(t)} className={`rounded-full px-3 py-1.5 text-xs font-medium ${leadTypeFilter === t ? 'bg-orange text-white' : 'bg-stone-100 text-stone-600'}`}>
-            {t === 'all' ? 'All' : t === 'student' ? 'B2C' : 'B2B'}
+            {t === 'all' ? 'All' : t === 'student' ? 'Students (B2C)' : 'Partners (B2B)'}
           </button>
         ))}
         <span className="mx-1 h-4 w-px bg-stone-200" />
@@ -75,7 +112,7 @@ export default function AdminLeadsPanel({
 
       {leadViewMode === 'board' ? (
         <LeadKanban
-          leads={leads}
+          leads={displayLeads}
           onOpenLead={openLeadDetail}
           onStatusChange={async (lead, status) => {
             await api.admin.updateLead(lead.id || lead._id, { status, note: 'Moved via pipeline board' });
@@ -93,6 +130,10 @@ export default function AdminLeadsPanel({
               <option value="all">All Status</option>
               {LEAD_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
+            <select className="dm-input w-auto" value={leadPriorityFilter || 'all'} onChange={(e) => setLeadPriorityFilter(e.target.value)}>
+              <option value="all">All Priority</option>
+              {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
             <PartnerSelect
               value={leadPartnerFilter || 'all'}
               onChange={setLeadPartnerFilter}
@@ -103,6 +144,22 @@ export default function AdminLeadsPanel({
               showReload={false}
               includeStatuses={['all']}
             />
+            {staffUsers.length > 0 && (
+              <select className="dm-input w-auto min-w-[160px]" value={leadAssigneeFilter || 'all'} onChange={(e) => setLeadAssigneeFilter(e.target.value)}>
+                <option value="all">All Assignees</option>
+                {staffUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                ))}
+              </select>
+            )}
+            <div>
+              <label className="dm-label text-xs">From</label>
+              <input type="date" className="dm-input w-auto" value={leadDateFrom || ''} onChange={(e) => setLeadDateFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="dm-label text-xs">To</label>
+              <input type="date" className="dm-input w-auto" value={leadDateTo || ''} onChange={(e) => setLeadDateTo(e.target.value)} />
+            </div>
             <input className="dm-input min-w-[180px] flex-1" placeholder="Search leads..." value={search} onChange={(e) => setSearch(e.target.value)} />
             <button type="button" onClick={load} className="dm-btn-ghost"><Search className="h-4 w-4" /></button>
             <button type="button" onClick={() => openQuickLead?.(leadTypeFilter === 'business' ? 'business' : 'student')} className="dm-btn-primary"><Plus className="h-4 w-4" /> Add Lead</button>
@@ -111,21 +168,21 @@ export default function AdminLeadsPanel({
             <table className="dm-table w-full">
               <thead>
                 <tr>
-                  <th><SelectCheckbox checked={selectedLeads.length === leads.length && leads.length > 0} onChange={() => toggleAll(leads, selectedLeads, setSelectedLeads)} /></th>
-                  <th>ID</th><th>Type</th><th>Name / Contact</th><th>Partner</th><th>Status</th><th>Follow-up</th>
+                  <th><SelectCheckbox checked={selectedLeads.length === displayLeads.length && displayLeads.length > 0} onChange={() => toggleAll(displayLeads, selectedLeads, setSelectedLeads)} /></th>
+                  <th>Dreamz ID</th><th>Type</th><th>Name / Contact</th><th>Partner</th><th>Status</th><th>Follow-up</th>
                 </tr>
               </thead>
               <tbody>
-                {leads.length === 0 && (
+                {displayLeads.length === 0 && (
                   <tr>
                     <td colSpan={7} className="py-10 text-center text-stone-400">No leads found. Use Add Lead or change filters.</td>
                   </tr>
                 )}
-                {leads.map((lead) => (
+                {displayLeads.map((lead) => (
                   <tr key={lead.id || lead._id} className="cursor-pointer" onClick={() => openLeadDetail(lead)}>
                     <td onClick={(e) => e.stopPropagation()}><SelectCheckbox checked={selectedLeads.includes(lead.id || lead._id)} onChange={() => setSelectedLeads((s) => { const id = lead.id || lead._id; return s.includes(id) ? s.filter((x) => x !== id) : [...s, id]; })} /></td>
                     <td className="font-mono text-gold-dark">{lead.leadId}</td>
-                    <td><span className={`dm-badge text-xs ${lead.leadType === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>{lead.leadType === 'business' ? 'B2B' : 'B2C'}</span></td>
+                    <td><span className={`dm-badge text-xs ${lead.leadType === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>{lead.leadType === 'business' ? 'Partners (B2B)' : 'Students (B2C)'}</span></td>
                     <td className="font-medium">{leadDisplayName(lead)}<br /><span className="text-xs text-stone-400">{leadDisplayPhone(lead)}</span></td>
                     <td>{lead.partner?.name || lead.partnerName}</td>
                     <td><StatusBadge status={lead.status} /></td>

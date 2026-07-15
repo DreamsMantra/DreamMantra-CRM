@@ -5,6 +5,8 @@ export const PARTNER_TAB_ALIASES = {
   commissions: { tab: 'money' },
   payout: { tab: 'money' },
   franchise: { tab: 'agency-hub' },
+  product: { tab: 'product-info' },
+  products: { tab: 'product-info' },
 };
 
 export const PARTNER_PAGE_TITLES = {
@@ -22,6 +24,8 @@ export const PARTNER_PAGE_TITLES = {
   notifications: { title: 'Notifications', desc: 'Alerts and updates' },
   marketing: { title: 'Marketing Kit', desc: 'Brochures and social templates' },
   training: { title: 'Training', desc: 'Product and sales resources' },
+  'product-info': { title: 'Product Info', desc: 'Allocated products and product resources' },
+  rates: { title: 'Rates', desc: 'List and sale prices for your products' },
   support: { title: 'Support', desc: 'Get help from our team' },
   wallet: { title: 'Wallet', desc: 'Balance and transaction history' },
   students: { title: 'Students', desc: 'Converted student records' },
@@ -66,6 +70,8 @@ export const PARTNER_TAB_GROUPS = [
     tabs: [
       { tab: 'marketing', label: 'Marketing Kit' },
       { tab: 'training', label: 'Training' },
+      { tab: 'product-info', label: 'Product Info' },
+      { tab: 'rates', label: 'Rates' },
       { tab: 'support', label: 'Support' },
     ],
   },

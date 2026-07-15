@@ -27,20 +27,32 @@ import { useAuth } from '../context/AuthContext';
 import { getNavForRole, getDashboardTitle, AGENCY_TYPES } from '../config/roleNavigation';
 import { leadDisplayName, leadDisplayPhone } from '../config/adminTabs';
 import { LEAD_STATUSES, formatDate, formatCurrency, partnerTypeLabel, PARTNER_TIERS } from '../utils/constants';
+import { playDuplicateBuzz } from '../utils/duplicateBuzz';
 
-const MARKETING_KIT = [
-  { title: 'Dream Mantra Brochure', type: 'PDF' },
-  { title: 'Social Media Templates', type: 'Canva' },
-  { title: 'WhatsApp Message Scripts', type: 'Doc' },
-  { title: 'Partner Presentation Deck', type: 'PPT' },
-];
-
-const TRAINING_RESOURCES = [
-  { title: 'How to Submit Quality Leads', duration: '15 min' },
-  { title: 'Brain Mapping Product Overview', duration: '20 min' },
-  { title: 'Commission & Payout Guide', duration: '10 min' },
-  { title: 'Agency Team Onboarding', duration: '25 min' },
-];
+function ResourceLinkCards({ items, emptyLabel = 'No resources available yet' }) {
+  if (!items?.length) {
+    return <p className="dm-card p-8 text-center text-sm text-stone-400">{emptyLabel}</p>;
+  }
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {items.map((m) => (
+        <a
+          key={m.id || `${m.title}-${m.url}`}
+          href={m.url || '#'}
+          target={m.url ? '_blank' : undefined}
+          rel={m.url ? 'noreferrer' : undefined}
+          className="dm-card flex items-center justify-between gap-3 p-4 transition hover:border-gold/40 hover:shadow-md"
+        >
+          <div className="min-w-0">
+            <p className="font-medium text-stone-800 truncate">{m.title}</p>
+            {m.url && <p className="mt-0.5 truncate text-xs text-stone-400">{m.url}</p>}
+          </div>
+          <span className="dm-badge shrink-0">{m.type || 'link'}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
 
 export default function PartnerDashboard() {
   const { user, refreshUser, token } = useAuth();
@@ -73,6 +85,9 @@ export default function PartnerDashboard() {
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [phoneCheck, setPhoneCheck] = useState(null);
   const [leadTemplateFields, setLeadTemplateFields] = useState([]);
+  const [partnerProducts, setPartnerProducts] = useState([]);
+  const [partnerRates, setPartnerRates] = useState([]);
+  const [partnerResources, setPartnerResources] = useState([]);
 
   useEffect(() => {
     api.auth.formTemplate('lead').then((r) => setLeadTemplateFields(r.fields || [])).catch(() => {});
@@ -123,6 +138,25 @@ export default function PartnerDashboard() {
       }
       if (tab === 'leaderboard' || tab === 'overview') {
         tasks.push(api.partner.leaderboard().then(setLeaderboard));
+      }
+      if (['training', 'marketing', 'product-info'].includes(tab)) {
+        const category = tab === 'product-info' ? 'product' : tab;
+        tasks.push(
+          safe(() => api.partner.resources({ category }), { resources: [] })
+            .then((d) => setPartnerResources(d.resources || []))
+        );
+      }
+      if (tab === 'product-info') {
+        tasks.push(
+          safe(() => api.partner.products(), { products: [] })
+            .then((d) => setPartnerProducts(d.products || []))
+        );
+      }
+      if (tab === 'rates') {
+        tasks.push(
+          safe(() => api.partner.rates(), { rates: [] })
+            .then((d) => setPartnerRates(d.rates || []))
+        );
       }
       await Promise.all(tasks);
     } catch (err) {
@@ -179,7 +213,10 @@ export default function PartnerDashboard() {
       load();
     } catch (err) {
       setError(err.message);
-      if (err.data?.duplicates) setPhoneCheck(err.data.duplicates);
+      if (err.data?.duplicates || /duplicate/i.test(err.message || '')) {
+        playDuplicateBuzz();
+        if (err.data?.duplicates) setPhoneCheck(err.data.duplicates);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -189,7 +226,14 @@ export default function PartnerDashboard() {
     if (phone.length < 10) { setPhoneCheck(null); return; }
     try {
       const { duplicates } = await api.partner.checkDuplicate(phone);
-      setPhoneCheck(duplicates.length ? duplicates : null);
+      if (duplicates.length) {
+        setPhoneCheck((prev) => {
+          if (!prev?.length) playDuplicateBuzz();
+          return duplicates;
+        });
+      } else {
+        setPhoneCheck(null);
+      }
     } catch { setPhoneCheck(null); }
   };
 
@@ -334,12 +378,12 @@ export default function PartnerDashboard() {
                 <button type="button" onClick={() => { setLeadForm({ ...emptyLeadForm, leadType: 'student' }); setLeadModal(true); }} className="dm-card p-5 text-left hover:border-orange/40 hover:shadow-md transition">
                   <Plus className="mb-2 h-6 w-6 text-orange" />
                   <p className="font-semibold">Add Student Lead</p>
-                  <p className="text-xs text-stone-500">Quick B2C — name & phone</p>
+                  <p className="text-xs text-stone-500">Quick Students (B2C) — name & phone</p>
                 </button>
                 <button type="button" onClick={() => { setLeadForm({ ...emptyLeadForm, leadType: 'business' }); setLeadModal(true); }} className="dm-card p-5 text-left hover:border-indigo-300 hover:shadow-md transition">
                   <Plus className="mb-2 h-6 w-6 text-indigo-600" />
                   <p className="font-semibold">Add Business Lead</p>
-                  <p className="text-xs text-stone-500">School / college / B2B</p>
+                  <p className="text-xs text-stone-500">School / college / Partners (B2B)</p>
                 </button>
               </div>
 
@@ -350,7 +394,7 @@ export default function PartnerDashboard() {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="dm-table w-full">
-                    <thead><tr><th>Lead ID</th><th>Student</th><th>Status</th><th>Date</th></tr></thead>
+                    <thead><tr><th>Dreamz ID</th><th>Student</th><th>Status</th><th>Date</th></tr></thead>
                     <tbody>
                       {(dashboard?.recentLeads || []).map((lead) => (
                         <tr key={lead.id || lead._id} className="cursor-pointer" onClick={() => openLead(lead)}>
@@ -403,12 +447,12 @@ export default function PartnerDashboard() {
           </div>
           <div className="dm-card overflow-x-auto">
             <table className="dm-table w-full">
-              <thead><tr><th>Lead ID</th><th>Type</th><th>Name / Contact</th><th>Phone</th><th>Class / Org</th><th>Status</th><th>Priority</th><th>Updated</th></tr></thead>
+              <thead><tr><th>Dreamz ID</th><th>Type</th><th>Name / Contact</th><th>Phone</th><th>Class / Org</th><th>Status</th><th>Priority</th><th>Updated</th></tr></thead>
               <tbody>
                 {leads.map((lead) => (
                   <tr key={lead.id || lead._id} className="cursor-pointer" onClick={() => openLead(lead)}>
                     <td className="font-mono text-gold-dark">{lead.leadId}</td>
-                    <td><span className={`dm-badge text-xs ${lead.leadType === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>{lead.leadType === 'business' ? 'B2B' : 'B2C'}</span></td>
+                    <td><span className={`dm-badge text-xs ${lead.leadType === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>{lead.leadType === 'business' ? 'Partners (B2B)' : 'Students (B2C)'}</span></td>
                     <td className="font-medium">{leadDisplayName(lead)}</td>
                     <td>{leadDisplayPhone(lead)}</td>
                     <td>{lead.leadType === 'business' ? (lead.businessType || '—') : (lead.classGrade || '—')}</td>
@@ -577,7 +621,7 @@ export default function PartnerDashboard() {
         <div className="dm-card overflow-x-auto">
           <h2 className="dm-section-title p-4 pb-0">Student Status</h2>
           <table className="dm-table w-full mt-4">
-            <thead><tr><th>Lead ID</th><th>Student</th><th>Class</th><th>Status</th><th>Updated</th></tr></thead>
+            <thead><tr><th>Dreamz ID</th><th>Student</th><th>Class</th><th>Status</th><th>Updated</th></tr></thead>
             <tbody>
               {leads.map((l) => (
                 <tr key={l.id} className="cursor-pointer hover:bg-stone-50" onClick={() => openLead(l)}>
@@ -602,25 +646,67 @@ export default function PartnerDashboard() {
       )}
 
       {tab === 'marketing' && (
-        <div className="grid gap-3 md:grid-cols-2">
-          {MARKETING_KIT.map((m) => (
-            <div key={m.title} className="dm-card p-4 flex justify-between items-center">
-              <span className="font-medium">{m.title}</span>
-              <span className="dm-badge">{m.type}</span>
-            </div>
-          ))}
-        </div>
+        <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
+          <ResourceLinkCards items={partnerResources} emptyLabel="No marketing resources yet" />
+        </DashboardSection>
       )}
 
       {tab === 'training' && (
-        <div className="space-y-3">
-          {TRAINING_RESOURCES.map((t) => (
-            <div key={t.title} className="dm-card p-4 flex justify-between">
-              <span>{t.title}</span>
-              <span className="text-sm text-stone-500">{t.duration}</span>
+        <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
+          <ResourceLinkCards items={partnerResources} emptyLabel="No training resources yet" />
+        </DashboardSection>
+      )}
+
+      {tab === 'product-info' && (
+        <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
+          <div className="space-y-6">
+            <div className="grid gap-3 md:grid-cols-2">
+              {partnerProducts.map((p) => (
+                <div key={p.id} className="dm-card p-4">
+                  <p className="font-semibold text-stone-900">{p.label}</p>
+                  <p className="mt-1 text-sm text-stone-500">Base price: {formatCurrency(p.price)}</p>
+                  {p.commission && (
+                    <p className="mt-1 text-xs text-gold-dark">
+                      Commission: {p.commission.type === 'percentage' ? `${p.commission.value}%` : formatCurrency(p.commission.value)}
+                    </p>
+                  )}
+                </div>
+              ))}
+              {!partnerProducts.length && (
+                <p className="dm-card col-span-full p-8 text-center text-sm text-stone-400">No products allocated to you yet</p>
+              )}
             </div>
-          ))}
-        </div>
+            <SectionBlock title="Product resources">
+              <ResourceLinkCards items={partnerResources} emptyLabel="No product resources yet" />
+            </SectionBlock>
+          </div>
+        </DashboardSection>
+      )}
+
+      {tab === 'rates' && (
+        <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
+          <div className="dm-card overflow-x-auto">
+            <table className="dm-table w-full">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>List price</th>
+                  <th>Sale price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {partnerRates.map((r) => (
+                  <tr key={r.rateId || r.productId}>
+                    <td className="font-medium">{r.label}</td>
+                    <td>{formatCurrency(r.listPrice)}</td>
+                    <td className="font-semibold text-emerald-700">{formatCurrency(r.salePrice)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!partnerRates.length && <p className="p-8 text-center text-sm text-stone-400">No rates available for your products</p>}
+          </div>
+        </DashboardSection>
       )}
 
       {tab === 'support' && (
@@ -655,8 +741,11 @@ export default function PartnerDashboard() {
 
       <Modal open={leadModal} onClose={() => setLeadModal(false)} title="Add Lead" wide>
         {phoneCheck && (
-          <div className="dm-alert-warning mb-4 text-sm">
-            Possible duplicate: {phoneCheck.map((d) => `${leadDisplayName(d)} (${d.leadId})`).join(', ')}
+          <div className="mb-4 rounded-xl border-2 border-amber-500 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
+            <p className="font-semibold text-amber-900">Possible duplicate phone</p>
+            <p className="mt-1 text-amber-800">
+              {phoneCheck.map((d) => `${leadDisplayName(d) || d.studentName} (${d.leadId})`).join(', ')}
+            </p>
           </div>
         )}
         <LeadForm
@@ -674,7 +763,7 @@ export default function PartnerDashboard() {
         />
       </Modal>
 
-      <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Lead ${selectedLead?.leadId}`} wide>
+      <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Dreamz ID ${selectedLead?.leadId}`} wide>
         {selectedLead && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">

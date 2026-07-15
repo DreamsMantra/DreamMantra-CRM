@@ -47,6 +47,11 @@ export const defaultStore = {
     ],
     commissionRules: [],
     rolePermissions: {},
+    customRoles: [],
+    productAllocations: [],
+    rates: [],
+    partnerResources: [],
+    defaultResources: [],
     leadStatuses: null,
     automationEnabled: true,
     slaFollowUpHours: 24,
@@ -92,6 +97,11 @@ function normalizeStore(store) {
   if (!normalized.settings.products) normalized.settings.products = defaultStore.settings.products;
   if (!normalized.settings.commissionRules) normalized.settings.commissionRules = [];
   if (!normalized.settings.rolePermissions) normalized.settings.rolePermissions = {};
+  if (!Array.isArray(normalized.settings.customRoles)) normalized.settings.customRoles = [];
+  if (!Array.isArray(normalized.settings.productAllocations)) normalized.settings.productAllocations = [];
+  if (!Array.isArray(normalized.settings.rates)) normalized.settings.rates = [];
+  if (!Array.isArray(normalized.settings.partnerResources)) normalized.settings.partnerResources = [];
+  if (!Array.isArray(normalized.settings.defaultResources)) normalized.settings.defaultResources = [];
   if (!normalized.settings.emailTemplates) normalized.settings.emailTemplates = defaultStore.settings.emailTemplates;
   if (!normalized.settings.whatsappTemplates) normalized.settings.whatsappTemplates = defaultStore.settings.whatsappTemplates;
   if (!normalized.automations.length) {

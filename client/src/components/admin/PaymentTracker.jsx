@@ -88,7 +88,7 @@ export default function PaymentTracker({ leads = [], embedded = false }) {
 
       <div className="dm-card overflow-x-auto">
         <table className="dm-table w-full text-sm">
-          <thead><tr><th>Date</th><th>Lead</th><th>Student</th><th>Amount</th><th>Method</th><th>Reference</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Date</th><th>Dreamz ID</th><th>Student</th><th>Amount</th><th>Method</th><th>Reference</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             {payments.map((p) => (
               <tr key={p.id}>

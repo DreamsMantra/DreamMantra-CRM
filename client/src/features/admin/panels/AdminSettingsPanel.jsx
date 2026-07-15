@@ -2,6 +2,7 @@ import { Send } from 'lucide-react';
 import DashboardSection from '../../../components/layout/DashboardSection';
 import SectionBlock from '../../../components/layout/SectionBlock';
 import ProductsPricing from '../../../components/admin/ProductsPricing';
+import PartnerResourcesAdmin from '../../../components/admin/PartnerResourcesAdmin';
 import MasterControl from '../../../components/admin/MasterControl';
 import BulkLeadImport from '../../../components/BulkLeadImport';
 import PartnerSelect from '../../../components/PartnerSelect';
@@ -26,7 +27,6 @@ export default function AdminSettingsPanel({
     >
       {innerSub === 'general' && (
         <div className="space-y-6">
-          <ProductsPricing embedded />
           <SectionBlock title="CRM Settings">
             <form onSubmit={async (e) => { e.preventDefault(); await api.admin.updateSettings(settings); flash('Settings saved'); }} className="mx-auto max-w-xl space-y-4">
               {SETTINGS_FIELDS.map(({ key, label, type }) => (
@@ -49,9 +49,17 @@ export default function AdminSettingsPanel({
           </SectionBlock>
         </div>
       )}
+      {innerSub === 'pricing' && (
+        <div className="space-y-6">
+          <ProductsPricing embedded />
+        </div>
+      )}
       {innerSub === 'tools' && (
         <div className="space-y-6">
           <MasterControl token={token} onRefresh={load} flash={flash} fail={fail} partners={partners} leads={leads} onOpenLead={openLeadDetail} />
+          <SectionBlock title="Partner Resources" description="Share training, marketing, and product links with partners">
+            <PartnerResourcesAdmin embedded />
+          </SectionBlock>
           <div className="grid gap-6 lg:grid-cols-2">
             <SectionBlock title="Import Leads">
               <PartnerSelect

@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { loadStore, saveStore, newId, now, findById, sortByDate } from '../lib/store.js';
 import { DEFAULT_FORM_TEMPLATES } from '../data/formDefaults.js';
-import { STAFF_ROLES, getDefaultPermissions, isStaffRole, normalizeLeadStatus } from './roles.js';
+import { STAFF_ROLES, EDITABLE_STAFF_ROLES, USER_ROLES, getDefaultPermissions, isStaffRole, normalizeLeadStatus } from './roles.js';
 import { normalizeAgencyUser, isAgencyPartner, agencyTierTarget, AGENCY_ONBOARDING_KEYS } from './agency.js';
 import { generateLoginId, normalizeLoginId, generateReferralCode } from '../utils/ids.js';
 
@@ -172,6 +172,11 @@ export async function seedAdmin() {
 export function getLeads(filter = {}) {
   let leads = loadStore().leads;
   if (filter.partnerId) leads = leads.filter((l) => l.partnerId === filter.partnerId);
+  if (filter.agencyId) leads = leads.filter((l) => l.partnerId === filter.agencyId || l.agencyId === filter.agencyId);
+  if (filter.project && filter.project !== 'all') {
+    const q = String(filter.project).toLowerCase();
+    leads = leads.filter((l) => (l.project || '').toLowerCase() === q);
+  }
   if (filter.status && filter.status !== 'all') leads = leads.filter((l) => l.status === filter.status);
   if (filter.priority && filter.priority !== 'all') leads = leads.filter((l) => l.priority === filter.priority);
   if (filter.city && filter.city !== 'all') leads = leads.filter((l) => (l.city || '').toLowerCase().includes(filter.city.toLowerCase()));
@@ -188,7 +193,8 @@ export function getLeads(filter = {}) {
         (l.contactPerson || '').toLowerCase().includes(q) ||
         (l.contactPhone || '').includes(q) ||
         (l.leadId || '').toLowerCase().includes(q) ||
-        (l.partnerName || '').toLowerCase().includes(q)
+        (l.partnerName || '').toLowerCase().includes(q) ||
+        (l.project || '').toLowerCase().includes(q)
     );
   }
   return sortByDate(leads);
@@ -200,7 +206,13 @@ export function findLead(id) {
 
 export function createLead(data) {
   const store = loadStore();
-  const lead = { id: newId(), ...data, createdAt: now(), updatedAt: now() };
+  const lead = {
+    id: newId(),
+    ...data,
+    project: data.project != null ? data.project : null,
+    createdAt: now(),
+    updatedAt: now(),
+  };
   store.leads.push(lead);
   saveStore(store);
   return lead;
@@ -723,7 +735,7 @@ export function bulkCreateLeads(leadsData, partnerId, createdBy) {
 
 export function exportLeadsCSV(filter = {}) {
   const leads = getLeads(filter).map(populateLead);
-  const headers = ['Lead ID', 'Student', 'Phone', 'Email', 'Class', 'City', 'Status', 'Partner', 'Priority', 'Created'];
+  const headers = ['Dreamz ID', 'Student', 'Phone', 'Email', 'Class', 'City', 'Status', 'Partner', 'Priority', 'Created'];
   const rows = leads.map((l) => [
     l.leadId, l.studentName, l.studentPhone, l.studentEmail || '', l.classGrade || '',
     l.city || '', l.status, l.partnerName || '', l.priority || '', l.createdAt?.slice(0, 10) || '',
@@ -852,7 +864,7 @@ export function exportPartnersCSV() {
 
 export function exportCommissionsCSV() {
   const items = getCommissions().map(populateCommission);
-  const headers = ['Partner', 'Lead ID', 'Student', 'Amount', 'Rate', 'Status', 'Paid At', 'Reference'];
+  const headers = ['Partner', 'Dreamz ID', 'Student', 'Amount', 'Rate', 'Status', 'Paid At', 'Reference'];
   const rows = items.map((c) => [
     c.partner?.name, c.lead?.leadId, c.lead?.studentName, c.amount, c.rate,
     c.status, c.paidAt?.slice(0, 10) || '', c.paymentReference || '',
@@ -1034,6 +1046,245 @@ export function updateProducts(products) {
   return products;
 }
 
+// ─── Custom roles ───
+export function getCustomRoles() {
+  return loadStore().settings.customRoles || [];
+}
+
+export function getAllRolesForAdmin() {
+  const customRoles = getCustomRoles();
+  const rolePermissions = getRolePermissions();
+  const builtin = EDITABLE_STAFF_ROLES;
+  const customKeys = customRoles.map((r) => r.key);
+  return {
+    roles: [...builtin, ...customKeys],
+    builtin,
+    customRoles,
+    defaults: Object.fromEntries(builtin.map((r) => [r, getDefaultPermissions(r)])),
+    rolePermissions,
+  };
+}
+
+function slugifyRoleKey(label) {
+  const base = (label || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_]/g, '');
+  return base || `role_${newId().slice(0, 6)}`;
+}
+
+export function createCustomRole({ label, permissions, key }) {
+  const store = loadStore();
+  if (!store.settings.customRoles) store.settings.customRoles = [];
+  const labelText = (label || '').trim();
+  if (!labelText) throw new Error('label required');
+  let roleKey = key ? slugifyRoleKey(key) : slugifyRoleKey(labelText);
+  let n = 1;
+  const taken = (k) =>
+    USER_ROLES.includes(k) ||
+    EDITABLE_STAFF_ROLES.includes(k) ||
+    store.settings.customRoles.some((r) => r.key === k);
+  while (taken(roleKey)) roleKey = `${slugifyRoleKey(labelText)}_${n++}`;
+  const role = {
+    id: newId(),
+    key: roleKey,
+    label: labelText,
+    permissions: Array.isArray(permissions) ? permissions : [],
+  };
+  store.settings.customRoles.push(role);
+  saveStore(store);
+  return role;
+}
+
+export function updateCustomRole(id, updates) {
+  const store = loadStore();
+  const idx = (store.settings.customRoles || []).findIndex((r) => r.id === id || r.key === id);
+  if (idx === -1) return null;
+  const existing = store.settings.customRoles[idx];
+  const next = { ...existing };
+  if (updates.label != null) next.label = String(updates.label).trim();
+  if (updates.permissions != null) next.permissions = Array.isArray(updates.permissions) ? updates.permissions : existing.permissions;
+  if (updates.key != null) {
+    const roleKey = slugifyRoleKey(updates.key);
+    const clash = store.settings.customRoles.some(
+      (r, i) => i !== idx && r.key === roleKey
+    ) || USER_ROLES.includes(roleKey);
+    if (!clash) next.key = roleKey;
+  }
+  store.settings.customRoles[idx] = next;
+  saveStore(store);
+  return next;
+}
+
+export function deleteCustomRole(id) {
+  const store = loadStore();
+  const before = store.settings.customRoles || [];
+  const removed = before.find((r) => r.id === id || r.key === id);
+  if (!removed) return null;
+  store.settings.customRoles = before.filter((r) => r.id !== removed.id);
+  if (store.settings.rolePermissions?.[removed.key]) {
+    delete store.settings.rolePermissions[removed.key];
+  }
+  saveStore(store);
+  return removed;
+}
+
+// ─── Product allocations ───
+export function getProductAllocations() {
+  return loadStore().settings.productAllocations || [];
+}
+
+export function setProductAllocations(allocations) {
+  const store = loadStore();
+  store.settings.productAllocations = Array.isArray(allocations)
+    ? allocations.map((a) => ({
+        productId: a.productId,
+        partnerIds: Array.isArray(a.partnerIds) ? a.partnerIds : [],
+      }))
+    : [];
+  saveStore(store);
+  return store.settings.productAllocations;
+}
+
+export function getAllocatedProductsForPartner(partnerId) {
+  const allocations = getProductAllocations();
+  if (!allocations.length) return [];
+  const productIds = allocations
+    .filter((a) => {
+      const ids = a.partnerIds || [];
+      return ids.includes(partnerId) || ids.includes('all');
+    })
+    .map((a) => a.productId);
+  return getProducts().filter((p) => productIds.includes(p.id));
+}
+
+// ─── Rates (list / sale pricing) ───
+export function getRates(filter = {}) {
+  let rates = loadStore().settings.rates || [];
+  if (filter.audience) rates = rates.filter((r) => r.audience === filter.audience);
+  if (filter.productId) rates = rates.filter((r) => r.productId === filter.productId);
+  if (filter.partnerId != null && filter.partnerId !== '') {
+    rates = rates.filter(
+      (r) => r.partnerId === filter.partnerId || r.partnerId === 'all' || r.partnerId == null
+    );
+  }
+  return rates;
+}
+
+export function upsertRate(data) {
+  const store = loadStore();
+  if (!store.settings.rates) store.settings.rates = [];
+  const payload = {
+    audience: data.audience === 'student' ? 'student' : 'partner',
+    productId: data.productId,
+    partnerId: data.partnerId == null || data.partnerId === '' ? null : data.partnerId,
+    listPrice: Number(data.listPrice) || 0,
+    salePrice: Number(data.salePrice) || 0,
+  };
+  if (data.id) {
+    const idx = store.settings.rates.findIndex((r) => r.id === data.id);
+    if (idx !== -1) {
+      store.settings.rates[idx] = { ...store.settings.rates[idx], ...payload };
+      saveStore(store);
+      return store.settings.rates[idx];
+    }
+  }
+  const rate = { id: newId(), ...payload };
+  store.settings.rates.push(rate);
+  saveStore(store);
+  return rate;
+}
+
+export function deleteRate(id) {
+  const store = loadStore();
+  const before = store.settings.rates || [];
+  const removed = before.find((r) => r.id === id);
+  if (!removed) return null;
+  store.settings.rates = before.filter((r) => r.id !== id);
+  saveStore(store);
+  return removed;
+}
+
+/** Partner-facing rates for allocated products */
+export function getRatesForPartner(partnerId) {
+  const products = getAllocatedProductsForPartner(partnerId);
+  const rates = getRates({ audience: 'partner' });
+  return products.map((product) => {
+    const specific = rates.find((r) => r.productId === product.id && r.partnerId === partnerId);
+    const shared = rates.find(
+      (r) => r.productId === product.id && (r.partnerId === 'all' || r.partnerId == null)
+    );
+    const rate = specific || shared;
+    return {
+      productId: product.id,
+      label: product.label,
+      listPrice: rate?.listPrice ?? product.price ?? 0,
+      salePrice: rate?.salePrice ?? product.price ?? 0,
+      rateId: rate?.id || null,
+    };
+  });
+}
+
+// ─── Partner / default resources ───
+export function getPartnerResources(partnerId, category) {
+  let resources = loadStore().settings.partnerResources || [];
+  if (partnerId && partnerId !== 'all') {
+    resources = resources.filter((r) => r.partnerId === partnerId || r.partnerId === 'all');
+  } else if (partnerId === 'all') {
+    resources = resources.filter((r) => r.partnerId === 'all');
+  }
+  if (category) resources = resources.filter((r) => r.category === category);
+  return resources;
+}
+
+export function addPartnerResource(data) {
+  const store = loadStore();
+  if (!store.settings.partnerResources) store.settings.partnerResources = [];
+  const resource = {
+    id: newId(),
+    partnerId: data.partnerId || 'all',
+    category: data.category || 'training',
+    title: (data.title || '').trim(),
+    type: data.type || 'link',
+    url: (data.url || '').trim(),
+    createdAt: now(),
+  };
+  store.settings.partnerResources.push(resource);
+  saveStore(store);
+  return resource;
+}
+
+export function deletePartnerResource(id) {
+  const store = loadStore();
+  const before = store.settings.partnerResources || [];
+  const removed = before.find((r) => r.id === id);
+  if (!removed) return null;
+  store.settings.partnerResources = before.filter((r) => r.id !== id);
+  saveStore(store);
+  return removed;
+}
+
+/**
+ * Partner-specific resources for category, else partnerId='all', else settings.defaultResources.
+ */
+export function getResourcesForPartner(partnerId, category) {
+  const store = loadStore();
+  const partnerResources = store.settings.partnerResources || [];
+  const defaults = store.settings.defaultResources || [];
+
+  const matchCat = (list) =>
+    category ? list.filter((r) => r.category === category) : list;
+
+  const specific = matchCat(partnerResources.filter((r) => r.partnerId === partnerId));
+  if (specific.length) return specific;
+
+  const forAll = matchCat(partnerResources.filter((r) => r.partnerId === 'all'));
+  if (forAll.length) return forAll;
+
+  return matchCat(defaults.map((r) => ({ ...r, partnerId: r.partnerId || 'all' })));
+}
+
 // ─── Students (from leads pipeline) ───
 export function leadToStudent(lead) {
   return {
@@ -1054,6 +1305,7 @@ export function leadToStudent(lead) {
     city: lead.city,
     state: lead.state,
     products: lead.interestedIn || [],
+    project: lead.project || null,
     partnerId: lead.partnerId,
     partnerName: lead.partnerName,
     status: normalizeLeadStatus(lead.status),
@@ -1073,6 +1325,12 @@ export function getStudents(filter = {}) {
     : store.leads.filter((l) => !['lost', 'new'].includes(normalizeLeadStatus(l.status))).map(leadToStudent);
   if (filter.assignedSalesId) students = students.filter((s) => s.assignedSalesId === filter.assignedSalesId);
   if (filter.assignedCounsellorId) students = students.filter((s) => s.assignedCounsellorId === filter.assignedCounsellorId);
+  const partnerId = filter.partnerId || filter.agencyId;
+  if (partnerId && partnerId !== 'all') students = students.filter((s) => s.partnerId === partnerId);
+  if (filter.project && filter.project !== 'all') {
+    const q = String(filter.project).toLowerCase();
+    students = students.filter((s) => (s.project || '').toLowerCase() === q);
+  }
   if (filter.status && filter.status !== 'all') students = students.filter((s) => s.status === filter.status);
   if (filter.search) {
     const q = filter.search.toLowerCase();
@@ -1080,7 +1338,8 @@ export function getStudents(filter = {}) {
       (s) =>
         (s.studentName || '').toLowerCase().includes(q) ||
         (s.mobile || '').includes(q) ||
-        (s.leadId || '').toLowerCase().includes(q)
+        (s.leadId || '').toLowerCase().includes(q) ||
+        (s.project || '').toLowerCase().includes(q)
     );
   }
   return sortByDate(students);

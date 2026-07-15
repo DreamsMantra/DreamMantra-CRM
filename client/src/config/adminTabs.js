@@ -1,12 +1,12 @@
 /** Lead segment: B2C students vs B2B business */
 
-export const ADMIN_TAB_IDS = ['overview', 'leads', 'partners', 'students', 'finance', 'reports', 'team', 'settings'];
+export const ADMIN_TAB_IDS = ['overview', 'leads', 'partners', 'students', 'finance', 'reports', 'team', 'messages', 'settings'];
 
 export const LEAD_TYPES = [
 
-  { value: 'student', label: 'Student (B2C)', short: 'B2C' },
+  { value: 'student', label: 'Students (B2C)', short: 'Students (B2C)' },
 
-  { value: 'business', label: 'Business (B2B)', short: 'B2B' },
+  { value: 'business', label: 'Partners (B2B)', short: 'Partners (B2B)' },
 
 ];
 
@@ -34,7 +34,7 @@ export const BUSINESS_TYPES = [
 
 export function leadTypeLabel(type) {
 
-  return LEAD_TYPES.find((t) => t.value === type)?.label || (type === 'business' ? 'Business (B2B)' : 'Student (B2C)');
+  return LEAD_TYPES.find((t) => t.value === type)?.label || (type === 'business' ? 'Partners (B2B)' : 'Students (B2C)');
 
 }
 
@@ -92,7 +92,7 @@ export const ADMIN_TAB_ALIASES = {
 
   calendar: { tab: 'team', inner: 'calendar' },
 
-  messages: { tab: 'team', inner: 'messages' },
+  messages: { tab: 'messages' },
 
   users: { tab: 'team', inner: 'users' },
 
@@ -106,7 +106,9 @@ export const ADMIN_TAB_ALIASES = {
 
   payouts: { tab: 'finance', sub: 'payouts' },
 
-  products: { tab: 'settings', inner: 'general' },
+  products: { tab: 'settings', inner: 'pricing' },
+
+  pricing: { tab: 'settings', inner: 'pricing' },
 
   master: { tab: 'settings', inner: 'tools' },
 
@@ -152,13 +154,13 @@ export const ADMIN_SUB_TABS = {
 
     { id: 'calendar', label: 'Calendar' },
 
-    { id: 'messages', label: 'Messages' },
-
   ],
 
   settings: [
 
     { id: 'general', label: 'General' },
+
+    { id: 'pricing', label: 'Pricing' },
 
     { id: 'tools', label: 'Tools & Data' },
 
@@ -182,7 +184,9 @@ export const PAGE_TITLES = {
 
   reports: { title: 'Reports', desc: 'Analytics and conversion trends' },
 
-  team: { title: 'Team', desc: 'Users, roles, tasks and messages' },
+  team: { title: 'Team', desc: 'Users, roles, tasks and calendar' },
+
+  messages: { title: 'Messages', desc: 'Chat with partners and team' },
 
   settings: { title: 'Settings', desc: 'CRM configuration and tools' },
 
@@ -222,5 +226,3 @@ export function resolveAdminRoute(searchParams) {
   return { rawTab, tab, sub, inner, alias };
 
 }
-
-

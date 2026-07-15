@@ -175,17 +175,33 @@ export function getDefaultPermissions(role) {
   return DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.partner;
 }
 
-export function resolveRolePermissions(role, customMap = {}) {
+/** Builtin role keys plus custom role keys from settings.customRoles */
+export function listRoleKeys(customRoles = []) {
+  const customKeys = (customRoles || []).map((r) => r.key).filter(Boolean);
+  return [...USER_ROLES, ...customKeys];
+}
+
+/**
+ * Resolve permissions for a role.
+ * customMap = settings.rolePermissions overrides.
+ * customRoles = settings.customRoles — for custom roles, uses rolePermissions[role] or role.permissions.
+ */
+export function resolveRolePermissions(role, customMap = {}, customRoles = []) {
   if (role === 'super_admin') return ['*'];
-  const custom = customMap[role];
-  if (Array.isArray(custom) && custom.length) return custom;
+  const fromMap = customMap[role];
+  if (Array.isArray(fromMap) && fromMap.length) return fromMap;
+  const customRole = (customRoles || []).find((r) => r.key === role || r.id === role);
+  if (customRole) {
+    if (Array.isArray(customRole.permissions) && customRole.permissions.length) return customRole.permissions;
+    return [];
+  }
   return getDefaultPermissions(role);
 }
 
-export function userHasPermission(user, permission, customMap = {}) {
+export function userHasPermission(user, permission, customMap = {}, customRoles = []) {
   if (!user) return false;
   if (user.role === 'super_admin') return true;
-  const perms = resolveRolePermissions(user.role, customMap);
+  const perms = resolveRolePermissions(user.role, customMap, customRoles);
   if (perms.includes('*')) return true;
   return perms.includes(permission);
 }

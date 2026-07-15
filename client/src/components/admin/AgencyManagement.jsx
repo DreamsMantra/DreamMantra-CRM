@@ -105,9 +105,9 @@ export default function AgencyManagement({ onEdit, onAdd }) {
         <form onSubmit={saveEdit} className="space-y-3">
           <div><label className="dm-label">Agency Name</label><input className="dm-input" value={editForm.agencyName} onChange={(e) => setEditForm({ ...editForm, agencyName: e.target.value })} required /></div>
           <div><label className="dm-label">Territory</label><input className="dm-input" value={editForm.territory} onChange={(e) => setEditForm({ ...editForm, territory: e.target.value })} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="dm-label">Centres</label><input type="number" min={1} className="dm-input" value={editForm.outletCount} onChange={(e) => setEditForm({ ...editForm, outletCount: Number(e.target.value) })} /></div>
-            <div><label className="dm-label">Royalty %</label><input type="number" className="dm-input" value={editForm.royaltyPercent} onChange={(e) => setEditForm({ ...editForm, royaltyPercent: Number(e.target.value) })} /></div>
+          <div>
+            <label className="dm-label">Centres</label>
+            <input type="number" min={1} className="dm-input" value={editForm.outletCount} onChange={(e) => setEditForm({ ...editForm, outletCount: Number(e.target.value) })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="dm-label">Commission %</label><input type="number" className="dm-input" value={editForm.commissionRate} onChange={(e) => setEditForm({ ...editForm, commissionRate: Number(e.target.value) })} /></div>
