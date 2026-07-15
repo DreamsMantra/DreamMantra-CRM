@@ -70,6 +70,7 @@ export const api = {
     products: () => request('/partner/products'),
     rates: () => request('/partner/rates'),
     resources: (params = {}) => request(`/partner/resources?${qs(params)}`),
+    upsertProductRateOverride: (body) => request('/partner/product-rate-overrides', { method: 'POST', body: JSON.stringify(body) }),
     projects: () => request('/partner/projects'),
     createProject: (body) => request('/partner/projects', { method: 'POST', body: JSON.stringify(body) }),
     updateProject: (id, body) => request(`/partner/projects/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

@@ -303,6 +303,33 @@ router.get('/rates', activePartnerOnly, (req, res) => {
   res.json({ rates: db.getRatesForPartner(req.user.id) });
 });
 
+/** Partner/agency may change Selling only — never Cost */
+router.post('/product-rate-overrides', activePartnerOnly, (req, res) => {
+  try {
+    const scope = req.body.scope === 'project' ? 'project' : req.body.scope === 'lead' ? 'lead' : 'partner';
+    let entityId = req.body.entityId;
+    if (scope === 'partner') entityId = req.user.id;
+    if (scope === 'project') {
+      const proj = db.getAgencyProjects(req.user.id).find((p) => p.id === entityId);
+      if (!proj) return res.status(404).json({ message: 'Project not found' });
+    }
+    if (scope === 'lead') {
+      const lead = db.findLead(entityId);
+      if (!lead || lead.partnerId !== req.user.id) return res.status(404).json({ message: 'Lead not found' });
+    }
+    const override = db.upsertProductRateOverride({
+      scope,
+      entityId,
+      productId: req.body.productId,
+      sellingPrice: req.body.sellingPrice ?? req.body.salePrice,
+      // cost intentionally omitted — agency/partner cannot set cost
+    }, { allowCost: false });
+    res.status(201).json({ override });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 router.get('/resources', activePartnerOnly, (req, res) => {
   const category = req.query.category;
   if (category && !['training', 'marketing', 'product'].includes(category)) {

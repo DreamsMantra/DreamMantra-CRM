@@ -82,7 +82,8 @@ export default function PartnerProfilePage({
       const drafts = {};
       (d.productRates || []).forEach((r) => {
         drafts[r.productId] = {
-          salePrice: r.salePrice,
+          costPrice: r.costPrice,
+          sellingPrice: r.sellingPrice,
           commissionType: r.commission?.type || 'fixed',
           commissionValue: r.commission?.value ?? 0,
         };
@@ -133,11 +134,37 @@ export default function PartnerProfilePage({
         scope: 'partner',
         entityId: partnerId,
         productId,
-        salePrice: Number(d.salePrice),
-        listPrice: Number(d.salePrice),
+        costPrice: Number(d.costPrice),
+        sellingPrice: Number(d.sellingPrice),
         commission: { type: d.commissionType, value: Number(d.commissionValue) },
       });
-      flash?.('Product rate saved');
+      flash?.('Product prices saved for this partner');
+      load();
+    } catch (err) { fail?.(err); }
+  };
+
+  const saveProjectSelling = async (projectId, productId, sellingPrice) => {
+    try {
+      await api.admin.upsertProductRateOverride({
+        scope: 'project',
+        entityId: projectId,
+        productId,
+        sellingPrice: Number(sellingPrice),
+      });
+      flash?.('Project selling price saved (agency cannot change cost)');
+      load();
+    } catch (err) { fail?.(err); }
+  };
+
+  const saveProjectCost = async (projectId, productId, costPrice) => {
+    try {
+      await api.admin.upsertProductRateOverride({
+        scope: 'project',
+        entityId: projectId,
+        productId,
+        costPrice: Number(costPrice),
+      });
+      flash?.('Project cost price saved (Admin only)');
       load();
     } catch (err) { fail?.(err); }
   };
@@ -420,7 +447,7 @@ export default function PartnerProfilePage({
       )}
 
       {activeTab === 'projects' && isAgency && (
-        <SectionBlock title="Agency projects" description="School visits / campaigns — track batches of leads and their pipeline stages">
+        <SectionBlock title="Agency projects" description="School / campaign batches. Selling price is shared across leads in a project. Cost is Admin-only (agency cannot change cost).">
           <form onSubmit={createProject} className="mb-4 grid gap-3 rounded-xl border border-orange/20 bg-orange/5 p-4 sm:grid-cols-3">
             <div>
               <label className="dm-label">Project name</label>
@@ -451,6 +478,19 @@ export default function PartnerProfilePage({
                   ))}
                   {!Object.keys(pr.stages || {}).length && <span className="text-xs text-stone-400">No leads assigned yet — use Leads tab to assign</span>}
                 </div>
+                {(pr.productPrices || []).length > 0 && (
+                  <div className="mt-3 space-y-2 border-t border-stone-100 pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Project prices</p>
+                    {(pr.productPrices || []).map((pp) => (
+                      <ProjectPriceRow
+                        key={pp.productId}
+                        product={pp}
+                        onSaveCost={(cost) => saveProjectCost(pr.id, pp.productId, cost)}
+                        onSaveSelling={(sell) => saveProjectSelling(pr.id, pp.productId, sell)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
             {!projects.length && <p className="text-sm text-stone-400">No projects yet. Create one for each school or campaign.</p>}
@@ -459,7 +499,14 @@ export default function PartnerProfilePage({
       )}
 
       {activeTab === 'rates' && (
-        <SectionBlock title="Products & rates" description="Catalogue defaults with partner-specific overrides">
+        <SectionBlock
+          title="Products & rates"
+          description={
+            isAgency
+              ? 'Cost = what we sell to this agency. Selling = what they charge customers. Agency can change selling (incl. per project), not cost. Only allocated products are listed.'
+              : 'Cost = what we sell to this partner. Selling = default customer price (can still vary per lead). Only allocated products are listed.'
+          }
+        >
           <div className="space-y-3">
             {productRates.map((r) => {
               const d = rateDrafts[r.productId] || {};
@@ -467,27 +514,37 @@ export default function PartnerProfilePage({
                 <div key={r.productId} className="grid items-end gap-3 rounded-xl border border-stone-100 p-3 sm:grid-cols-5">
                   <div>
                     <p className="flex items-center gap-1 text-sm font-semibold"><Package className="h-3.5 w-3.5" /> {r.label}</p>
-                    <p className="text-xs text-stone-400">Catalogue ₹{r.cataloguePrice}{r.hasOverride ? ' · overridden' : ''}</p>
+                    {r.hasOverride && <p className="text-[10px] text-orange">Partner override active</p>}
                   </div>
                   <div>
-                    <label className="dm-label">Sale price</label>
-                    <input type="number" className="dm-input" value={d.salePrice ?? ''} onChange={(e) => setRateDrafts({ ...rateDrafts, [r.productId]: { ...d, salePrice: e.target.value } })} />
+                    <label className="dm-label">Cost price ₹</label>
+                    <input type="number" className="dm-input" value={d.costPrice ?? ''} onChange={(e) => setRateDrafts({ ...rateDrafts, [r.productId]: { ...d, costPrice: e.target.value } })} />
+                    <p className="text-[10px] text-stone-400">Admin only</p>
                   </div>
                   <div>
-                    <label className="dm-label">Commission type</label>
-                    <select className="dm-input" value={d.commissionType || 'fixed'} onChange={(e) => setRateDrafts({ ...rateDrafts, [r.productId]: { ...d, commissionType: e.target.value } })}>
-                      <option value="fixed">Fixed ₹</option>
-                      <option value="percentage">Percentage %</option>
-                    </select>
+                    <label className="dm-label">Selling price ₹</label>
+                    <input type="number" className="dm-input" value={d.sellingPrice ?? ''} onChange={(e) => setRateDrafts({ ...rateDrafts, [r.productId]: { ...d, sellingPrice: e.target.value } })} />
                   </div>
-                  <div>
-                    <label className="dm-label">Value</label>
-                    <input type="number" className="dm-input" value={d.commissionValue ?? ''} onChange={(e) => setRateDrafts({ ...rateDrafts, [r.productId]: { ...d, commissionValue: e.target.value } })} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="dm-label">Comm.</label>
+                      <select className="dm-input" value={d.commissionType || 'fixed'} onChange={(e) => setRateDrafts({ ...rateDrafts, [r.productId]: { ...d, commissionType: e.target.value } })}>
+                        <option value="fixed">₹</option>
+                        <option value="percentage">%</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="dm-label">Value</label>
+                      <input type="number" className="dm-input" value={d.commissionValue ?? ''} onChange={(e) => setRateDrafts({ ...rateDrafts, [r.productId]: { ...d, commissionValue: e.target.value } })} />
+                    </div>
                   </div>
                   <button type="button" className="dm-btn-ghost text-sm" onClick={() => saveRate(r.productId)}>Save</button>
                 </div>
               );
             })}
+            {!productRates.length && (
+              <p className="text-sm text-stone-400">No products allocated. Assign products under Settings → Products &amp; Pricing.</p>
+            )}
           </div>
         </SectionBlock>
       )}
@@ -622,6 +679,30 @@ function Field({ label, value, onChange }) {
     <div>
       <label className="dm-label">{label}</label>
       <input className="dm-input" value={value || ''} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+function ProjectPriceRow({ product, onSaveCost, onSaveSelling }) {
+  const [cost, setCost] = useState(product.costPrice ?? '');
+  const [selling, setSelling] = useState(product.sellingPrice ?? '');
+  useEffect(() => {
+    setCost(product.costPrice ?? '');
+    setSelling(product.sellingPrice ?? '');
+  }, [product.costPrice, product.sellingPrice, product.productId]);
+  return (
+    <div className="flex flex-wrap items-end gap-2 rounded-lg bg-stone-50 p-2 text-sm">
+      <span className="min-w-[7rem] font-medium">{product.label}</span>
+      <div>
+        <label className="dm-label text-[10px]">Cost ₹ (Admin)</label>
+        <input type="number" className="dm-input w-24" value={cost} onChange={(e) => setCost(e.target.value)} />
+      </div>
+      <button type="button" className="dm-btn-ghost text-[10px]" onClick={() => onSaveCost(cost)}>Save cost</button>
+      <div>
+        <label className="dm-label text-[10px]">Selling ₹</label>
+        <input type="number" className="dm-input w-24" value={selling} onChange={(e) => setSelling(e.target.value)} />
+      </div>
+      <button type="button" className="dm-btn-ghost text-[10px]" onClick={() => onSaveSelling(selling)}>Save selling</button>
     </div>
   );
 }

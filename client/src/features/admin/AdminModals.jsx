@@ -308,8 +308,8 @@ export default function AdminModals({
 
 function LeadProductRates({ lead, flash }) {
   const [products, setProducts] = useState([]);
-  const [overrides, setOverrides] = useState([]);
   const [drafts, setDrafts] = useState({});
+  const [onProject, setOnProject] = useState(false);
   const leadId = lead?.id || lead?._id;
 
   useEffect(() => {
@@ -317,64 +317,72 @@ function LeadProductRates({ lead, flash }) {
     Promise.all([
       api.admin.products(),
       api.admin.productRateOverrides({ scope: 'lead', entityId: leadId }),
-    ]).then(([p, o]) => {
+      lead.projectId
+        ? api.admin.productRateOverrides({ scope: 'project', entityId: lead.projectId })
+        : Promise.resolve({ overrides: [] }),
+    ]).then(([p, leadOv, projOv]) => {
       const list = p.products || [];
       setProducts(list);
-      setOverrides(o.overrides || []);
+      setOnProject(!!lead.projectId);
       const d = {};
       list.forEach((prod) => {
-        const ov = (o.overrides || []).find((x) => x.productId === prod.id);
-        d[prod.id] = {
-          salePrice: ov?.salePrice ?? prod.price,
-          commissionType: ov?.commission?.type || prod.commission?.type || 'fixed',
-          commissionValue: ov?.commission?.value ?? prod.commission?.value ?? 0,
-        };
+        const lov = (leadOv.overrides || []).find((x) => x.productId === prod.id);
+        const pov = (projOv.overrides || []).find((x) => x.productId === prod.id);
+        const cost = lov?.costPrice ?? lov?.listPrice ?? pov?.costPrice ?? pov?.listPrice ?? prod.costPrice ?? prod.price;
+        const sell = lov?.sellingPrice ?? lov?.salePrice ?? pov?.sellingPrice ?? pov?.salePrice ?? prod.defaultSellingPrice ?? prod.price;
+        d[prod.id] = { costPrice: cost, sellingPrice: sell };
       });
       setDrafts(d);
     }).catch(() => {});
-  }, [leadId]);
+  }, [leadId, lead?.projectId]);
 
   const save = async (productId) => {
     const d = drafts[productId];
-    await api.admin.upsertProductRateOverride({
-      scope: 'lead',
-      entityId: leadId,
-      productId,
-      salePrice: Number(d.salePrice),
-      listPrice: Number(d.salePrice),
-      commission: { type: d.commissionType, value: Number(d.commissionValue) },
-    });
-    flash?.('Lead product rate saved');
+    if (lead.projectId) {
+      await api.admin.upsertProductRateOverride({
+        scope: 'project',
+        entityId: lead.projectId,
+        productId,
+        costPrice: Number(d.costPrice),
+        sellingPrice: Number(d.sellingPrice),
+      });
+      flash?.('Project prices saved — applies to all leads in this project');
+    } else {
+      await api.admin.upsertProductRateOverride({
+        scope: 'lead',
+        entityId: leadId,
+        productId,
+        costPrice: Number(d.costPrice),
+        sellingPrice: Number(d.sellingPrice),
+      });
+      flash?.('Lead prices saved');
+    }
   };
 
   if (!products.length) return <p className="mt-2 text-sm text-stone-400">No products.</p>;
 
   return (
     <div className="mt-3 space-y-2">
-      <p className="text-xs text-stone-500">Override catalogue price/commission for this {lead?.leadType === 'business' ? 'potential partner' : 'potential student'}.</p>
+      <p className="text-xs text-stone-500">
+        Cost = what we charge the partner · Selling = customer price.
+        {onProject
+          ? ' This lead is on a project — prices apply to the whole project. Agency cannot change cost.'
+          : ' Normal partner: selling can differ per lead.'}
+      </p>
       {products.map((prod) => {
         const d = drafts[prod.id] || {};
-        const hasOv = overrides.some((o) => o.productId === prod.id);
         return (
-          <div key={prod.id} className="grid gap-2 rounded-lg bg-stone-50 p-2 sm:grid-cols-5 sm:items-end">
+          <div key={prod.id} className="grid gap-2 rounded-lg bg-stone-50 p-2 sm:grid-cols-4 sm:items-end">
             <div>
               <p className="text-sm font-medium">{prod.label}</p>
-              <p className="text-[10px] text-stone-400">{hasOv ? 'Custom' : `Catalogue ₹${prod.price}`}</p>
             </div>
             <div>
-              <label className="dm-label">Sale ₹</label>
-              <input type="number" className="dm-input" value={d.salePrice ?? ''} onChange={(e) => setDrafts({ ...drafts, [prod.id]: { ...d, salePrice: e.target.value } })} />
+              <label className="dm-label">Cost ₹</label>
+              <input type="number" className="dm-input" value={d.costPrice ?? ''} onChange={(e) => setDrafts({ ...drafts, [prod.id]: { ...d, costPrice: e.target.value } })} />
             </div>
             <div>
-              <label className="dm-label">Type</label>
-              <select className="dm-input" value={d.commissionType || 'fixed'} onChange={(e) => setDrafts({ ...drafts, [prod.id]: { ...d, commissionType: e.target.value } })}>
-                <option value="fixed">Fixed</option>
-                <option value="percentage">%</option>
-              </select>
-            </div>
-            <div>
-              <label className="dm-label">Value</label>
-              <input type="number" className="dm-input" value={d.commissionValue ?? ''} onChange={(e) => setDrafts({ ...drafts, [prod.id]: { ...d, commissionValue: e.target.value } })} />
+              <label className="dm-label">Selling ₹</label>
+              <input type="number" className="dm-input" value={d.sellingPrice ?? ''} onChange={(e) => setDrafts({ ...drafts, [prod.id]: { ...d, sellingPrice: e.target.value } })} />
             </div>
             <button type="button" className="dm-btn-ghost text-xs" onClick={() => save(prod.id)}>Save</button>
           </div>

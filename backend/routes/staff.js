@@ -130,7 +130,7 @@ router.post('/product-rate-overrides', (req, res) => {
     } else if (req.user.role !== 'sales_executive' && req.user.role !== 'report_management') {
       return res.status(403).json({ message: 'Not allowed' });
     }
-    const override = db.upsertProductRateOverride({ ...req.body, scope });
+    const override = db.upsertProductRateOverride({ ...req.body, scope }, { allowCost: false });
     res.status(201).json({ override });
   } catch (err) {
     res.status(400).json({ message: err.message });

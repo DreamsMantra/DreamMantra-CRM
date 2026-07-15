@@ -988,7 +988,8 @@ router.get('/product-rate-overrides', (req, res) => {
 
 router.post('/product-rate-overrides', (req, res) => {
   try {
-    const override = db.upsertProductRateOverride(req.body);
+    // Admin routes: can set Cost + Selling
+    const override = db.upsertProductRateOverride(req.body, { allowCost: true });
     db.logActivity({
       userId: req.user.id,
       userName: req.user.name,

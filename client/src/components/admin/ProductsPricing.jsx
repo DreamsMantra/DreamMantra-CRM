@@ -87,13 +87,36 @@ export default function ProductsPricing({ embedded = false }) {
     setSaving(true);
     setError('');
     try {
-      await api.admin.updateProducts(products);
-      flash('Products & commission rules saved');
+      const payload = products.map((p) => ({
+        id: p.id,
+        label: p.label,
+        price: Number(p.costPrice ?? p.price) || 0,
+        costPrice: Number(p.costPrice ?? p.price) || 0,
+        defaultSellingPrice: Number(p.defaultSellingPrice ?? p.price) || 0,
+        commission: p.commission,
+      }));
+      const res = await api.admin.updateProducts(payload);
+      setProducts(res.products || payload);
+      flash('Products & prices saved');
     } catch (err) {
       setError(err.message || 'Failed to save products');
     } finally {
       setSaving(false);
     }
+  };
+
+  const addProduct = () => {
+    setProducts((prev) => [
+      ...prev,
+      {
+        id: `prod_${Date.now()}`,
+        label: 'New product',
+        price: 0,
+        costPrice: 0,
+        defaultSellingPrice: 0,
+        commission: { type: 'fixed', value: 0 },
+      },
+    ]);
   };
 
   const saveAllocations = async () => {
@@ -185,21 +208,30 @@ export default function ProductsPricing({ embedded = false }) {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <h4 className="font-semibold text-stone-800">Products & commissions</h4>
-          <button type="button" className="dm-btn-gold text-sm" disabled={saving} onClick={saveProducts}>
-            Save Products
-          </button>
+          <h4 className="font-semibold text-stone-800">Products, cost & selling</h4>
+          <div className="flex gap-2">
+            <button type="button" className="dm-btn-ghost text-sm" onClick={addProduct}><Plus className="h-4 w-4" /> Add product</button>
+            <button type="button" className="dm-btn-gold text-sm" disabled={saving} onClick={saveProducts}>
+              Save Products
+            </button>
+          </div>
         </div>
         <div className="space-y-3">
           {products.map((p, i) => (
-            <div key={p.id} className="dm-card p-4 grid gap-3 md:grid-cols-4">
+            <div key={p.id} className="dm-card p-4 grid gap-3 md:grid-cols-5">
               <div>
                 <label className="dm-label">Product</label>
                 <input className="dm-input" value={p.label} onChange={(e) => update(i, 'label', e.target.value)} />
               </div>
               <div>
-                <label className="dm-label">Price (₹)</label>
-                <input type="number" className="dm-input" value={p.price} onChange={(e) => update(i, 'price', Number(e.target.value))} />
+                <label className="dm-label">Cost price (₹)</label>
+                <input type="number" className="dm-input" value={p.costPrice ?? p.price ?? ''} onChange={(e) => { update(i, 'price', Number(e.target.value)); update(i, 'costPrice', Number(e.target.value)); }} />
+                <p className="mt-0.5 text-[10px] text-stone-400">What we charge the partner</p>
+              </div>
+              <div>
+                <label className="dm-label">Default selling (₹)</label>
+                <input type="number" className="dm-input" value={p.defaultSellingPrice ?? ''} onChange={(e) => update(i, 'defaultSellingPrice', Number(e.target.value))} />
+                <p className="mt-0.5 text-[10px] text-stone-400">What partner sells to customer</p>
               </div>
               <div>
                 <label className="dm-label">Commission Type</label>
@@ -264,8 +296,8 @@ export default function ProductsPricing({ embedded = false }) {
       </section>
 
       <section className="space-y-3">
-        <h4 className="font-semibold text-stone-800">Rates</h4>
-        <p className="text-xs text-stone-500">List price is the catalogue price; sale price can vary per partner / audience.</p>
+        <h4 className="font-semibold text-stone-800">Extra rates (optional)</h4>
+        <p className="text-xs text-stone-500">Cost = price to partner · Selling = price to customer. Prefer partner profile / project overrides for day-to-day pricing.</p>
         <form onSubmit={submitRate} className="dm-card grid gap-3 p-4 md:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className="dm-label">Audience</label>
@@ -296,11 +328,11 @@ export default function ProductsPricing({ embedded = false }) {
             />
           </div>
           <div>
-            <label className="dm-label">List price (₹)</label>
+            <label className="dm-label">Cost price (₹)</label>
             <input type="number" className="dm-input" value={rateForm.listPrice} onChange={(e) => setRateForm({ ...rateForm, listPrice: e.target.value })} />
           </div>
           <div>
-            <label className="dm-label">Sale price (₹)</label>
+            <label className="dm-label">Selling price (₹)</label>
             <input type="number" className="dm-input" value={rateForm.salePrice} onChange={(e) => setRateForm({ ...rateForm, salePrice: e.target.value })} />
           </div>
           <div className="flex items-end gap-2">
@@ -323,8 +355,8 @@ export default function ProductsPricing({ embedded = false }) {
                 <th>Audience</th>
                 <th>Product</th>
                 <th>Partner</th>
-                <th>List</th>
-                <th>Sale</th>
+                <th>Cost</th>
+                <th>Selling</th>
                 <th>Actions</th>
               </tr>
             </thead>

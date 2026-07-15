@@ -826,18 +826,17 @@ export function getPartnerDetail(id) {
   const leads = getLeads({ partnerId: id });
   const commissions = getCommissions({ partnerId: id });
   const resources = getPartnerResources(id);
-  const products = getProducts();
+  const products = getAllocatedProductsForPartner(id);
   const overrides = getProductRateOverrides({ scope: 'partner', entityId: id });
   const productRates = products.map((prod) => {
+    const resolved = resolveProductRate({ productId: prod.id, partnerId: id });
     const ov = overrides.find((o) => o.productId === prod.id);
     return {
       productId: prod.id,
       label: prod.label,
-      cataloguePrice: prod.price,
-      catalogueCommission: prod.commission || { type: 'fixed', value: 0 },
-      listPrice: ov?.listPrice ?? prod.price,
-      salePrice: ov?.salePrice ?? prod.price,
-      commission: ov?.commission || prod.commission || { type: 'fixed', value: 0 },
+      costPrice: resolved?.costPrice ?? prod.costPrice ?? prod.price,
+      sellingPrice: resolved?.sellingPrice ?? prod.defaultSellingPrice ?? prod.price,
+      commission: resolved?.commission || prod.commission || { type: 'fixed', value: 0 },
       overrideId: ov?.id || null,
       hasOverride: !!ov,
     };
@@ -1108,14 +1107,37 @@ export function updateRolePermissions(rolePermissions, { replace = false } = {})
 }
 
 export function getProducts() {
-  return loadStore().settings.products || [];
+  return (loadStore().settings.products || []).map(normalizeProduct);
+}
+
+function normalizeProduct(p) {
+  const cost = Number(p.price ?? p.costPrice) || 0;
+  const selling = Number(p.defaultSellingPrice ?? p.sellingPrice ?? cost) || cost;
+  return {
+    ...p,
+    price: cost,
+    costPrice: cost,
+    defaultSellingPrice: selling,
+    commission: p.commission || { type: 'fixed', value: 0 },
+  };
 }
 
 export function updateProducts(products) {
   const store = loadStore();
-  store.settings.products = products;
+  store.settings.products = (products || []).map((p) => {
+    const cost = Number(p.costPrice ?? p.price) || 0;
+    return {
+      id: p.id || newId(),
+      label: (p.label || '').trim() || 'Product',
+      price: cost,
+      defaultSellingPrice: Number(p.defaultSellingPrice ?? p.sellingPrice ?? cost) || cost,
+      commission: p.commission
+        ? { type: p.commission.type === 'percentage' ? 'percentage' : 'fixed', value: Number(p.commission.value) || 0 }
+        : { type: 'fixed', value: 0 },
+    };
+  });
   saveStore(store);
-  return products;
+  return getProducts();
 }
 
 // ─── Custom roles ───
@@ -1221,14 +1243,24 @@ export function setProductAllocations(allocations) {
 
 export function getAllocatedProductsForPartner(partnerId) {
   const allocations = getProductAllocations();
-  if (!allocations.length) return [];
-  const productIds = allocations
-    .filter((a) => {
-      const ids = a.partnerIds || [];
-      return ids.includes(partnerId) || ids.includes('all');
-    })
-    .map((a) => a.productId);
-  return getProducts().filter((p) => productIds.includes(p.id));
+  const all = getProducts();
+  // No allocation config yet → show all products so Admin can still assign prices
+  if (!allocations.length) return all;
+  const productIds = new Set(
+    allocations
+      .filter((a) => {
+        const ids = a.partnerIds || [];
+        return ids.includes(partnerId) || ids.includes('all');
+      })
+      .map((a) => a.productId)
+  );
+  // If this partner has zero allocated products, return empty (explicitly no products)
+  const anyForPartner = allocations.some((a) => {
+    const ids = a.partnerIds || [];
+    return ids.includes(partnerId) || ids.includes('all');
+  });
+  if (!anyForPartner) return [];
+  return all.filter((p) => productIds.has(p.id));
 }
 
 // ─── Rates (list / sale pricing) ───
@@ -1278,7 +1310,7 @@ export function deleteRate(id) {
   return removed;
 }
 
-/** Per-entity product price/commission overrides (partner account or lead) */
+/** Per-entity product price/commission overrides (partner | project | lead) */
 export function getProductRateOverrides(filter = {}) {
   let list = loadStore().settings.productRateOverrides || [];
   if (filter.scope) list = list.filter((o) => o.scope === filter.scope);
@@ -1287,33 +1319,53 @@ export function getProductRateOverrides(filter = {}) {
   return list;
 }
 
-export function upsertProductRateOverride(data) {
+/**
+ * Upsert override.
+ * @param {object} data
+ * @param {{ allowCost?: boolean }} opts - partners/agencies must pass allowCost:false (default false for non-admin callers)
+ */
+export function upsertProductRateOverride(data, opts = {}) {
   const store = loadStore();
   if (!store.settings.productRateOverrides) store.settings.productRateOverrides = [];
-  const scope = data.scope === 'lead' ? 'lead' : 'partner';
+  const scope = ['lead', 'project', 'partner'].includes(data.scope) ? data.scope : 'partner';
   const entityId = data.entityId;
   const productId = data.productId;
   if (!entityId || !productId) throw new Error('entityId and productId required');
+
+  const allowCost = opts.allowCost !== false && data.allowCost !== false;
+  const costIn = data.costPrice != null ? data.costPrice : data.listPrice;
+  const sellIn = data.sellingPrice != null ? data.sellingPrice : data.salePrice;
+
   const payload = {
     scope,
     entityId,
     productId,
-    listPrice: data.listPrice != null ? Number(data.listPrice) : undefined,
-    salePrice: data.salePrice != null ? Number(data.salePrice) : undefined,
-    commission: data.commission
-      ? { type: data.commission.type === 'percentage' ? 'percentage' : 'fixed', value: Number(data.commission.value) || 0 }
-      : undefined,
     updatedAt: now(),
   };
+  if (sellIn != null && sellIn !== '') payload.sellingPrice = Number(sellIn);
+  if (allowCost && costIn != null && costIn !== '') payload.costPrice = Number(costIn);
+  // Legacy field mirrors for older readers
+  if (payload.sellingPrice != null) payload.salePrice = payload.sellingPrice;
+  if (payload.costPrice != null) payload.listPrice = payload.costPrice;
+  if (data.commission) {
+    payload.commission = {
+      type: data.commission.type === 'percentage' ? 'percentage' : 'fixed',
+      value: Number(data.commission.value) || 0,
+    };
+  }
+
   const idx = store.settings.productRateOverrides.findIndex(
     (o) => o.scope === scope && o.entityId === entityId && o.productId === productId
   );
   if (idx >= 0) {
-    store.settings.productRateOverrides[idx] = {
-      ...store.settings.productRateOverrides[idx],
-      ...payload,
-      id: store.settings.productRateOverrides[idx].id,
-    };
+    const prev = store.settings.productRateOverrides[idx];
+    const next = { ...prev, ...payload, id: prev.id };
+    // Partner/agency path: never overwrite existing cost with blank
+    if (!allowCost) {
+      next.costPrice = prev.costPrice ?? prev.listPrice;
+      next.listPrice = next.costPrice;
+    }
+    store.settings.productRateOverrides[idx] = next;
     saveStore(store);
     return store.settings.productRateOverrides[idx];
   }
@@ -1333,42 +1385,56 @@ export function deleteProductRateOverride(id) {
   return removed;
 }
 
-/** Resolve catalogue + lead override + partner override for a product */
-export function resolveProductRate({ productId, leadId, partnerId }) {
+function applyOverrideFields(base, ov) {
+  if (!ov) return;
+  const cost = ov.costPrice ?? ov.listPrice;
+  const sell = ov.sellingPrice ?? ov.salePrice;
+  if (cost != null) base.costPrice = Number(cost);
+  if (sell != null) base.sellingPrice = Number(sell);
+  if (ov.commission) base.commission = ov.commission;
+  base.listPrice = base.costPrice;
+  base.salePrice = base.sellingPrice;
+}
+
+/** Resolve Cost (to partner) + Selling (to customer). Agency cannot set cost via API. */
+export function resolveProductRate({ productId, leadId, partnerId, projectId }) {
   const products = getProducts();
   const prod = products.find((p) => p.id === productId || p.label === productId);
   if (!prod) return null;
   const base = {
     productId: prod.id,
     label: prod.label,
-    listPrice: prod.price,
-    salePrice: prod.price,
+    costPrice: prod.costPrice ?? prod.price ?? 0,
+    sellingPrice: prod.defaultSellingPrice ?? prod.price ?? 0,
     commission: prod.commission || { type: 'fixed', value: 0 },
   };
+  base.listPrice = base.costPrice;
+  base.salePrice = base.sellingPrice;
+
   if (partnerId) {
     const rates = getRates({ audience: 'partner', productId: prod.id });
     const specific = rates.find((r) => r.partnerId === partnerId);
     const shared = rates.find((r) => r.partnerId === 'all' || r.partnerId == null);
     const rate = specific || shared;
     if (rate) {
-      base.listPrice = rate.listPrice ?? base.listPrice;
-      base.salePrice = rate.salePrice ?? base.salePrice;
+      if (rate.listPrice != null) base.costPrice = Number(rate.listPrice);
+      if (rate.salePrice != null) base.sellingPrice = Number(rate.salePrice);
     }
-    const pov = getProductRateOverrides({ scope: 'partner', entityId: partnerId, productId: prod.id })[0];
-    if (pov) {
-      if (pov.listPrice != null) base.listPrice = pov.listPrice;
-      if (pov.salePrice != null) base.salePrice = pov.salePrice;
-      if (pov.commission) base.commission = pov.commission;
-    }
+    applyOverrideFields(base, getProductRateOverrides({ scope: 'partner', entityId: partnerId, productId: prod.id })[0]);
   }
+
+  const effectiveProjectId = projectId
+    || (leadId ? (findLead(leadId)?.projectId || null) : null);
+  if (effectiveProjectId) {
+    applyOverrideFields(base, getProductRateOverrides({ scope: 'project', entityId: effectiveProjectId, productId: prod.id })[0]);
+  }
+
   if (leadId) {
-    const lov = getProductRateOverrides({ scope: 'lead', entityId: leadId, productId: prod.id })[0];
-    if (lov) {
-      if (lov.listPrice != null) base.listPrice = lov.listPrice;
-      if (lov.salePrice != null) base.salePrice = lov.salePrice;
-      if (lov.commission) base.commission = lov.commission;
-    }
+    applyOverrideFields(base, getProductRateOverrides({ scope: 'lead', entityId: leadId, productId: prod.id })[0]);
   }
+
+  base.listPrice = base.costPrice;
+  base.salePrice = base.sellingPrice;
   return base;
 }
 
@@ -1377,11 +1443,12 @@ export function computeCommissionAmount(lead, partner) {
   let total = 0;
   const partnerId = partner?.id || lead.partnerId;
   const leadId = lead.id || lead._id;
+  const projectId = lead.projectId || null;
   if (interested.length) {
     interested.forEach((label) => {
-      const resolved = resolveProductRate({ productId: label, leadId, partnerId });
+      const resolved = resolveProductRate({ productId: label, leadId, partnerId, projectId });
       if (!resolved) return;
-      const price = resolved.salePrice ?? resolved.listPrice ?? 0;
+      const price = resolved.sellingPrice ?? resolved.salePrice ?? 0;
       if (resolved.commission?.type === 'fixed') total += Number(resolved.commission.value) || 0;
       else if (resolved.commission?.type === 'percentage') total += price * ((Number(resolved.commission.value) || 0) / 100);
     });
@@ -1389,8 +1456,8 @@ export function computeCommissionAmount(lead, partner) {
   if (!total) {
     const products = getProducts();
     if (products[0]) {
-      const resolved = resolveProductRate({ productId: products[0].id, leadId, partnerId });
-      const price = lead.dealValue || lead.expectedValue || resolved?.salePrice || 5000;
+      const resolved = resolveProductRate({ productId: products[0].id, leadId, partnerId, projectId });
+      const price = lead.dealValue || lead.expectedValue || resolved?.sellingPrice || 5000;
       if (resolved?.commission?.type === 'fixed') total = Number(resolved.commission.value) || 0;
       else if (resolved?.commission?.type === 'percentage') total = price * ((Number(resolved.commission.value) || 0) / 100);
       else total = price * ((partner?.commissionRate || 10) / 100);
@@ -1404,23 +1471,17 @@ export function computeCommissionAmount(lead, partner) {
 /** Partner-facing rates for allocated products */
 export function getRatesForPartner(partnerId) {
   const products = getAllocatedProductsForPartner(partnerId);
-  const rates = getRates({ audience: 'partner' });
-  const overrides = getProductRateOverrides({ scope: 'partner', entityId: partnerId });
   return products.map((product) => {
-    const ov = overrides.find((o) => o.productId === product.id);
-    const specific = rates.find((r) => r.productId === product.id && r.partnerId === partnerId);
-    const shared = rates.find(
-      (r) => r.productId === product.id && (r.partnerId === 'all' || r.partnerId == null)
-    );
-    const rate = specific || shared;
+    const resolved = resolveProductRate({ productId: product.id, partnerId });
     return {
       productId: product.id,
       label: product.label,
-      listPrice: ov?.listPrice ?? rate?.listPrice ?? product.price ?? 0,
-      salePrice: ov?.salePrice ?? rate?.salePrice ?? product.price ?? 0,
-      commission: ov?.commission || product.commission || { type: 'fixed', value: 0 },
-      rateId: rate?.id || null,
-      overrideId: ov?.id || null,
+      costPrice: resolved?.costPrice ?? product.costPrice ?? product.price ?? 0,
+      sellingPrice: resolved?.sellingPrice ?? product.defaultSellingPrice ?? product.price ?? 0,
+      commission: resolved?.commission || product.commission || { type: 'fixed', value: 0 },
+      // legacy
+      listPrice: resolved?.costPrice ?? product.price ?? 0,
+      salePrice: resolved?.sellingPrice ?? product.price ?? 0,
     };
   });
 }
@@ -1969,11 +2030,27 @@ export function enrichProject(project, leads = null) {
     const s = l.status || 'new';
     stages[s] = (stages[s] || 0) + 1;
   });
+  const products = getAllocatedProductsForPartner(project.partnerId);
+  const productPrices = products.map((prod) => {
+    const resolved = resolveProductRate({
+      productId: prod.id,
+      partnerId: project.partnerId,
+      projectId: project.id,
+    });
+    return {
+      productId: prod.id,
+      label: prod.label,
+      costPrice: resolved?.costPrice ?? prod.costPrice ?? 0,
+      sellingPrice: resolved?.sellingPrice ?? prod.defaultSellingPrice ?? 0,
+      commission: resolved?.commission || prod.commission,
+    };
+  });
   return {
     ...project,
     leadCount: projLeads.length,
     stages,
     converted: projLeads.filter((l) => ['converted', 'completed'].includes(l.status)).length,
+    productPrices,
   };
 }
 
