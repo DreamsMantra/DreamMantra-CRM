@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import * as db from '../lib/db.js';
 import { signToken, authRequired, loadUser } from '../middleware/auth.js';
+import { authRateLimit } from '../middleware/security.js';
 import { generateReferralCode, generateLoginId, isValidLoginId, normalizeLoginId, generateAgencyCode } from '../utils/helpers.js';
 
 const router = Router();
@@ -13,7 +14,7 @@ router.get('/forms/:name', (req, res) => {
   res.json({ fields: form.filter((f) => f.enabled !== false), formId: req.params.name });
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', authRateLimit, async (req, res) => {
   try {
     const { name, email, phone, password, partnerType, organization, city, state, address,
       franchiseName, territory, outletCount, investmentTier, operatingModel, agencyName } = req.body;
@@ -80,7 +81,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', authRateLimit, async (req, res) => {
   try {
     const identifier = (req.body.identifier || req.body.email || '').trim();
     const { password } = req.body;
@@ -127,7 +128,7 @@ router.put('/profile', authRequired, loadUser, (req, res) => {
   res.json({ user: db.userToSafeJSON(user) });
 });
 
-router.put('/change-password', authRequired, loadUser, async (req, res) => {
+router.put('/change-password', authRequired, loadUser, authRateLimit, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ message: 'Current and new password are required' });

@@ -4,6 +4,7 @@ import SectionBlock from '../../../components/layout/SectionBlock';
 import ProductsPricing from '../../../components/admin/ProductsPricing';
 import MasterControl from '../../../components/admin/MasterControl';
 import BulkLeadImport from '../../../components/BulkLeadImport';
+import PartnerSelect from '../../../components/PartnerSelect';
 import ExportButton from '../../../components/ExportButton';
 import AutomationRules from '../../../components/admin/AutomationRules';
 import AuditLog from '../../../components/admin/AuditLog';
@@ -53,10 +54,12 @@ export default function AdminSettingsPanel({
           <MasterControl token={token} onRefresh={load} flash={flash} fail={fail} partners={partners} leads={leads} onOpenLead={openLeadDetail} />
           <div className="grid gap-6 lg:grid-cols-2">
             <SectionBlock title="Import Leads">
-              <select className="dm-input mb-4" value={bulkImportPartner} onChange={(e) => setBulkImportPartner(e.target.value)}>
-                <option value="">Select partner</option>
-                {partners.filter((p) => p.status === 'active').map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <PartnerSelect
+                value={bulkImportPartner}
+                onChange={setBulkImportPartner}
+                placeholder="Select partner"
+                className="dm-input mb-1"
+              />
               <BulkLeadImport onImport={async (leadsData) => { if (!bulkImportPartner) { fail(new Error('Select a partner')); return; } const res = await api.admin.bulkLeads(bulkImportPartner, leadsData); flash(`Imported ${res.created} leads`); load(); }} />
             </SectionBlock>
             <SectionBlock title="Export">

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as db from '../lib/db.js';
 import { sortByDate } from '../lib/store.js';
 import { authRequired, loadUser } from '../middleware/auth.js';
+import { isAdminRole } from '../lib/roles.js';
 import { upload, detectMessageType } from '../lib/upload.js';
 import { notifyUser } from '../utils/helpers.js';
 
@@ -9,21 +10,9 @@ const router = Router();
 
 router.use(authRequired, loadUser);
 
-function resolveOtherUser(req) {
-  const admin = db.getAdminUser();
-  if (req.user.role === 'partner') {
-    if (!admin) throw new Error('Admin account not configured');
-    return admin;
-  }
-  const otherId = req.params.otherUserId || req.body.recipientId;
-  const other = db.findUser({ id: otherId });
-  if (!other || other.role !== 'partner') throw new Error('Partner not found');
-  return other;
-}
-
 router.get('/inbox', (req, res) => {
   const inbox = db.getInboxForUser(req.user.id, req.user.role);
-  if (req.user.role === 'admin') {
+  if (isAdminRole(req.user.role)) {
     const partners = db.queryUsers({ status: 'all' });
     partners.forEach((p) => {
       if (!inbox.find((i) => i.otherUserId === p.id)) {
@@ -32,11 +21,15 @@ router.get('/inbox', (req, res) => {
           otherUserName: p.name,
           otherUserRole: 'partner',
           otherUserAvatar: p.name?.charAt(0) || 'P',
+          otherUserStatus: p.status,
           lastMessage: 'Start conversation',
-          lastAt: p.createdAt,
+          lastAt: p.createdAt || p.updatedAt || new Date(0).toISOString(),
           unread: 0,
           conversationId: db.conversationId(req.user.id, p.id),
         });
+      } else {
+        const row = inbox.find((i) => i.otherUserId === p.id);
+        if (row) row.otherUserStatus = p.status;
       }
     });
   }
@@ -62,11 +55,13 @@ router.post('/send', upload.single('file'), async (req, res) => {
     let recipient;
     if (req.user.role === 'partner') {
       recipient = db.getAdminUser();
-    } else {
+    } else if (isAdminRole(req.user.role)) {
       recipient = db.findUser({ id: req.body.recipientId });
       if (!recipient || recipient.role !== 'partner') {
         return res.status(400).json({ message: 'Invalid recipient' });
       }
+    } else {
+      return res.status(403).json({ message: 'Not allowed to send messages' });
     }
 
     let attachment = null;
@@ -89,7 +84,7 @@ router.post('/send', upload.single('file'), async (req, res) => {
     const msg = db.createDirectMessage({
       senderId: req.user.id,
       senderName: req.user.name,
-      senderRole: req.user.role,
+      senderRole: isAdminRole(req.user.role) ? 'admin' : req.user.role,
       recipientId: recipient.id,
       text,
       attachment,
@@ -99,7 +94,7 @@ router.post('/send', upload.single('file'), async (req, res) => {
       title: `Message from ${req.user.name}`,
       message: text.slice(0, 80) || `Sent ${attachment?.name || 'a file'}`,
       type: 'message',
-      link: req.user.role === 'admin' ? '/partner?tab=messages' : '/admin?tab=messages',
+      link: req.user.role === 'partner' ? '/admin?tab=team&inner=messages' : '/partner?tab=messages',
     });
 
     res.status(201).json({ message: msg });

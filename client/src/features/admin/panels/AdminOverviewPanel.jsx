@@ -34,7 +34,7 @@ export default function AdminOverviewPanel({
           <p className="font-semibold text-stone-900">Add Partner</p>
           <p className="text-xs text-stone-500">Create login & credentials</p>
         </button>
-        <button type="button" onClick={() => onTab('leads', { view: 'board' })} className="dm-card p-5 text-left transition hover:border-stone-300 hover:shadow-md">
+        <button type="button" onClick={() => onTab?.('leads', { view: 'board' })} className="dm-card p-5 text-left transition hover:border-stone-300 hover:shadow-md">
           <Columns3 className="mb-2 h-6 w-6 text-stone-600" />
           <p className="font-semibold text-stone-900">Lead Board</p>
           <p className="text-xs text-stone-500">Drag to update status</p>
@@ -45,17 +45,17 @@ export default function AdminOverviewPanel({
         <div className="dm-card space-y-2 p-4">
           <p className="text-sm font-semibold text-stone-700">Needs your attention</p>
           {dashboard.stats?.pendingPartners > 0 && (
-            <button type="button" onClick={() => onTab('partners', { partnerFilter: 'pending' })} className="flex w-full items-center justify-between rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 hover:bg-amber-100">
+            <button type="button" onClick={() => onTab?.('partners', { partnerFilter: 'pending' })} className="flex w-full items-center justify-between rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 hover:bg-amber-100">
               <span>{dashboard.stats.pendingPartners} partner(s) waiting approval</span><span className="font-semibold">Review →</span>
             </button>
           )}
           {dashboard.followUpCounts?.overdue > 0 && (
-            <button type="button" onClick={() => onTab('leads', { panel: 'followups' })} className="flex w-full items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 hover:bg-red-100">
+            <button type="button" onClick={() => onTab?.('leads', { panel: 'followups' })} className="flex w-full items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 hover:bg-red-100">
               <span>{dashboard.followUpCounts.overdue} overdue follow-up(s)</span><span className="font-semibold">View →</span>
             </button>
           )}
           {duplicates.length > 0 && (
-            <button type="button" onClick={() => onTab('leads', { panel: 'duplicates' })} className="flex w-full items-center justify-between rounded-lg bg-orange/10 px-4 py-3 text-sm text-orange hover:bg-orange/15">
+            <button type="button" onClick={() => onTab?.('leads', { panel: 'duplicates' })} className="flex w-full items-center justify-between rounded-lg bg-orange/10 px-4 py-3 text-sm text-orange hover:bg-orange/15">
               <span>{duplicates.length} duplicate phone group(s)</span><span className="font-semibold">Fix →</span>
             </button>
           )}
@@ -63,17 +63,17 @@ export default function AdminOverviewPanel({
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={Users} label="Active Partners" value={dashboard.stats.activePartners} sub={`${dashboard.stats.pendingPartners} pending`} accent="gold" />
-        <StatCard icon={ClipboardList} label="Total Leads" value={dashboard.stats.totalLeads} sub={`${dashboard.stats.leadsThisMonth} this month`} accent="orange" />
-        <StatCard icon={TrendingUp} label="Converted" value={dashboard.stats.convertedLeads} accent="green" />
-        <StatCard icon={IndianRupee} label="Paid Out" value={formatCurrency(dashboard.stats.totalCommissionPaid)} sub={`${dashboard.stats.pendingCommissions} pending`} accent="blue" />
+        <StatCard icon={Users} label="Active Partners" value={dashboard.stats.activePartners} sub={`${dashboard.stats.pendingPartners} pending`} accent="gold" onClick={() => onTab?.('partners', { partnerFilter: 'active' })} />
+        <StatCard icon={ClipboardList} label="Total Leads" value={dashboard.stats.totalLeads} sub={`${dashboard.stats.leadsThisMonth} this month`} accent="orange" onClick={() => onTab?.('leads')} />
+        <StatCard icon={TrendingUp} label="Converted" value={dashboard.stats.convertedLeads} accent="green" onClick={() => onTab?.('leads', { panel: 'none' })} />
+        <StatCard icon={IndianRupee} label="Paid Out" value={formatCurrency(dashboard.stats.totalCommissionPaid)} sub={`${dashboard.stats.pendingCommissions} pending`} accent="blue" onClick={() => onTab?.('finance', { sub: 'commissions' })} />
       </div>
 
       {enterprise && (
         <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard label="Open Tasks" value={enterprise.openTasks || 0} accent="blue" />
-          <StatCard label="Pending Payouts" value={enterprise.pendingPayouts || 0} accent="gold" />
-          <StatCard label="Automations" value={enterprise.automationCount || 0} accent="orange" />
+          <StatCard label="Open Tasks" value={enterprise.openTasks || 0} accent="blue" onClick={() => onTab?.('team', { inner: 'tasks' })} />
+          <StatCard label="Pending Payouts" value={enterprise.pendingPayouts || 0} accent="gold" onClick={() => onTab?.('finance', { sub: 'payouts' })} />
+          <StatCard label="Automations" value={enterprise.automationCount || 0} accent="orange" onClick={() => onTab?.('settings', { inner: 'tools' })} />
         </div>
       )}
 

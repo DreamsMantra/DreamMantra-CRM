@@ -182,8 +182,10 @@ export function resolveRolePermissions(role, customMap = {}) {
   return getDefaultPermissions(role);
 }
 
-export function userHasPermission(user, permission) {
-  const perms = user?.permissions?.length ? user.permissions : getDefaultPermissions(user?.role);
+export function userHasPermission(user, permission, customMap = {}) {
+  if (!user) return false;
+  if (user.role === 'super_admin') return true;
+  const perms = resolveRolePermissions(user.role, customMap);
   if (perms.includes('*')) return true;
   return perms.includes(permission);
 }

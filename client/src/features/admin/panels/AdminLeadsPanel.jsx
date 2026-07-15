@@ -3,6 +3,7 @@ import DashboardSection from '../../../components/layout/DashboardSection';
 import StatusBadge from '../../../components/StatusBadge';
 import FollowUpList from '../../../components/FollowUpList';
 import LeadKanban from '../../../components/LeadKanban';
+import PartnerSelect from '../../../components/PartnerSelect';
 import { BulkActionBar, SelectCheckbox } from '../../../components/admin/AdminTools';
 import { LEAD_STATUSES, formatDate } from '../../../utils/constants';
 import { leadDisplayName, leadDisplayPhone } from '../../../config/adminTabs';
@@ -18,7 +19,7 @@ export default function AdminLeadsPanel({
     <DashboardSection
       title={pageInfo.title}
       description={pageInfo.desc}
-      actions={<button type="button" onClick={() => openQuickLead(leadTypeFilter === 'business' ? 'business' : 'student')} className="dm-btn-primary text-sm"><Plus className="h-4 w-4" /> Add Lead</button>}
+      actions={<button type="button" onClick={() => openQuickLead?.(leadTypeFilter === 'business' ? 'business' : 'student')} className="dm-btn-primary text-sm"><Plus className="h-4 w-4" /> Add Lead</button>}
     >
       {followUps.overdue?.length > 0 && leadsPanel === 'followups' && (
         <div className="dm-card border-l-4 border-l-red-500 p-4">
@@ -87,18 +88,24 @@ export default function AdminLeadsPanel({
           <BulkActionBar selected={selectedLeads} onClear={() => setSelectedLeads([])} actions={[
             ...LEAD_STATUSES.slice(0, 4).map((s) => ({ label: `→ ${s.label}`, onClick: () => bulkLeads(s.value) })),
           ]} />
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-end gap-3">
             <select className="dm-input w-auto" value={leadFilter} onChange={(e) => setLeadFilter(e.target.value)}>
               <option value="all">All Status</option>
               {LEAD_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
-            <select className="dm-input w-auto" value={leadPartnerFilter} onChange={(e) => setLeadPartnerFilter(e.target.value)}>
-              <option value="all">All Partners</option>
-              {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <PartnerSelect
+              value={leadPartnerFilter || 'all'}
+              onChange={setLeadPartnerFilter}
+              allowAll
+              allLabel="All Partners"
+              className="dm-input w-auto min-w-[200px]"
+              showMeta={false}
+              showReload={false}
+              includeStatuses={['all']}
+            />
             <input className="dm-input min-w-[180px] flex-1" placeholder="Search leads..." value={search} onChange={(e) => setSearch(e.target.value)} />
             <button type="button" onClick={load} className="dm-btn-ghost"><Search className="h-4 w-4" /></button>
-            <button type="button" onClick={() => openQuickLead(leadTypeFilter === 'business' ? 'business' : 'student')} className="dm-btn-primary"><Plus className="h-4 w-4" /> Add Lead</button>
+            <button type="button" onClick={() => openQuickLead?.(leadTypeFilter === 'business' ? 'business' : 'student')} className="dm-btn-primary"><Plus className="h-4 w-4" /> Add Lead</button>
           </div>
           <div className="dm-card overflow-x-auto">
             <table className="dm-table w-full">
@@ -109,6 +116,11 @@ export default function AdminLeadsPanel({
                 </tr>
               </thead>
               <tbody>
+                {leads.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-10 text-center text-stone-400">No leads found. Use Add Lead or change filters.</td>
+                  </tr>
+                )}
                 {leads.map((lead) => (
                   <tr key={lead.id || lead._id} className="cursor-pointer" onClick={() => openLeadDetail(lead)}>
                     <td onClick={(e) => e.stopPropagation()}><SelectCheckbox checked={selectedLeads.includes(lead.id || lead._id)} onChange={() => setSelectedLeads((s) => { const id = lead.id || lead._id; return s.includes(id) ? s.filter((x) => x !== id) : [...s, id]; })} /></td>

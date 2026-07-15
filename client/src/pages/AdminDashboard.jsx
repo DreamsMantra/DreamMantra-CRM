@@ -112,6 +112,42 @@ export default function AdminDashboard() {
   const flash = (msg) => { setMessage(msg); setTimeout(() => setMessage(''), 4000); };
   const fail = (err) => setError(err.message || 'Error');
 
+  const attentionItems = [];
+  if (dashboard?.stats?.pendingPartners > 0) {
+    attentionItems.push({
+      id: 'pending-partners',
+      type: 'partners',
+      title: `${dashboard.stats.pendingPartners} partner(s) waiting approval`,
+      desc: 'Review and approve registrations',
+      tone: 'bg-amber-50 text-amber-700',
+      tab: 'partners',
+      opts: { partnerFilter: 'pending' },
+    });
+  }
+  if (followUps.overdue?.length > 0) {
+    attentionItems.push({
+      id: 'overdue-followups',
+      type: 'followups',
+      title: `${followUps.overdue.length} overdue follow-up(s)`,
+      desc: 'Leads that need immediate contact',
+      tone: 'bg-red-50 text-red-700',
+      tab: 'leads',
+      opts: { panel: 'followups' },
+    });
+  }
+  if (duplicates.length > 0) {
+    attentionItems.push({
+      id: 'duplicates',
+      type: 'duplicates',
+      title: `${duplicates.length} duplicate phone group(s)`,
+      desc: 'Merge or clean duplicate leads',
+      tone: 'bg-orange/10 text-orange',
+      tab: 'leads',
+      opts: { panel: 'duplicates' },
+    });
+  }
+  const attentionCount = attentionItems.length;
+
   const sidebarLinks = getNavForRole(user?.role || 'super_admin').map((l) => ({
     ...l,
     badge: l.tab === 'leads' ? (followUps.overdue?.length || 0) + (duplicates.length || 0)
@@ -139,14 +175,13 @@ export default function AdminDashboard() {
       }
 
       if (forceAll || ['overview', 'partners', 'leads', 'finance', 'team', 'settings', 'students'].includes(tab)) {
-        const pStatus = tab === 'partners' ? partnerFilter : (forceAll ? partnerFilter : 'all');
-        const pType = tab === 'partners' ? partnerTypeFilter : 'all';
-        const pSearch = tab === 'partners' ? searchQuery : undefined;
-        tasks.push(safe(() => api.admin.partners({ status: pStatus, partnerType: pType, search: pSearch }), { partners: [] })
+        const partnerParams = { status: tab === 'partners' ? partnerFilter : 'all', partnerType: tab === 'partners' ? partnerTypeFilter : 'all' };
+        if (tab === 'partners' && searchQuery) partnerParams.search = searchQuery;
+        tasks.push(safe(() => api.admin.partners(partnerParams), { partners: [] })
           .then((d) => setPartners(d.partners || [])));
       }
 
-      if (forceAll || ['overview', 'leads', 'students', 'team', 'finance'].includes(tab)) {
+      if (forceAll || ['overview', 'leads', 'students', 'team', 'finance', 'settings'].includes(tab)) {
         const leadTypeParam = tab === 'leads' && leadTypeFilter !== 'all' ? leadTypeFilter : undefined;
         tasks.push(safe(() => api.admin.leads({
           status: tab === 'leads' ? leadFilter : 'all',
@@ -189,33 +224,44 @@ export default function AdminDashboard() {
 
   const refresh = useCallback(() => load({ force: true }), [load]);
   const openLeadDetail = async (lead) => {
-    setSelectedLead(lead);
+    const id = lead?.id || lead?._id;
+    let full = lead;
+    if (id && !lead?.studentName && !lead?.companyName && !lead?.status) {
+      full = leads.find((l) => (l.id || l._id) === id) || lead;
+      if (!full?.status) {
+        try {
+          const res = await api.admin.getLead(id);
+          full = res.lead || res;
+        } catch { /* use thin object */ }
+      }
+    }
+    setSelectedLead(full);
     setLeadUpdate({
-      status: lead.status, adminNotes: lead.adminNotes || '', note: '',
-      expectedValue: lead.expectedValue || 5000, priority: lead.priority,
-      followUpDate: lead.followUpDate?.slice?.(0, 10) || '', tags: (lead.tags || []).join(', '),
+      status: full.status, adminNotes: full.adminNotes || '', note: '',
+      expectedValue: full.expectedValue || 5000, priority: full.priority,
+      followUpDate: full.followUpDate?.slice?.(0, 10) || '', tags: (full.tags || []).join(', '),
     });
     setLeadEditForm({
-      leadType: lead.leadType || 'student',
-      studentName: lead.studentName || '', studentPhone: lead.studentPhone || '',
-      studentEmail: lead.studentEmail || '', classGrade: lead.classGrade || '',
-      parentName: lead.parentName || '', parentPhone: lead.parentPhone || '',
-      stream: lead.stream || '', schoolCollege: lead.schoolCollege || '',
-      city: lead.city || '', state: lead.state || '', pincode: lead.pincode || '',
-      companyName: lead.companyName || '', contactPerson: lead.contactPerson || '',
-      contactPhone: lead.contactPhone || lead.studentPhone || '',
-      contactEmail: lead.contactEmail || lead.studentEmail || '',
-      businessType: lead.businessType || '', estimatedStudents: lead.estimatedStudents || '',
-      dealValue: lead.dealValue || lead.expectedValue || '',
-      notes: lead.notes || '', priority: lead.priority || 'medium',
-      interestedIn: lead.interestedIn || [], gender: lead.gender || '',
-      dateOfBirth: lead.dateOfBirth || '', budget: lead.budget || '',
-      preferredContactTime: lead.preferredContactTime || '',
-      whatsappOptIn: lead.whatsappOptIn !== false,
+      leadType: full.leadType || 'student',
+      studentName: full.studentName || '', studentPhone: full.studentPhone || '',
+      studentEmail: full.studentEmail || '', classGrade: full.classGrade || '',
+      parentName: full.parentName || '', parentPhone: full.parentPhone || '',
+      stream: full.stream || '', schoolCollege: full.schoolCollege || '',
+      city: full.city || '', state: full.state || '', pincode: full.pincode || '',
+      companyName: full.companyName || '', contactPerson: full.contactPerson || '',
+      contactPhone: full.contactPhone || full.studentPhone || '',
+      contactEmail: full.contactEmail || full.studentEmail || '',
+      businessType: full.businessType || '', estimatedStudents: full.estimatedStudents || '',
+      dealValue: full.dealValue || full.expectedValue || '',
+      notes: full.notes || '', priority: full.priority || 'medium',
+      interestedIn: full.interestedIn || [], gender: full.gender || '',
+      dateOfBirth: full.dateOfBirth || '', budget: full.budget || '',
+      preferredContactTime: full.preferredContactTime || '',
+      whatsappOptIn: full.whatsappOptIn !== false,
     });
     setTransferPartnerId('');
     try {
-      const { comments } = await api.admin.leadComments(lead.id || lead._id);
+      const { comments } = await api.admin.leadComments(full.id || full._id || id);
       setLeadComments(comments);
     } catch { setLeadComments([]); }
   };
@@ -306,9 +352,24 @@ export default function AdminDashboard() {
   const setSub = (s) => setParams({ tab: 'finance', sub: s });
   const setInner = (s) => setParams({ tab, inner: s });
 
-  const openQuickLead = (leadType = 'student') => {
-    setAdminLeadForm({ ...emptyLeadForm, partnerId: partners.find((p) => p.status === 'active')?.id || '', leadType });
+  const openQuickLead = async (leadType = 'student') => {
+    const activeId = partners.find((p) => p.status === 'active')?.id || '';
+    setAdminLeadForm({ ...emptyLeadForm, partnerId: activeId, leadType });
     setLeadModal(true);
+    try {
+      const d = await api.admin.partners({ status: 'active' });
+      const list = d.partners || [];
+      if (list.length) {
+        setPartners((prev) => {
+          const map = new Map(prev.map((p) => [p.id, p]));
+          list.forEach((p) => map.set(p.id, p));
+          return Array.from(map.values());
+        });
+        if (!activeId) {
+          setAdminLeadForm((f) => ({ ...f, partnerId: list[0].id }));
+        }
+      }
+    } catch { /* keep cached partners */ }
   };
 
   const panelProps = {
@@ -318,8 +379,8 @@ export default function AdminDashboard() {
     search, setSearch, partnerFilter, setPartnerFilter, partnerTypeFilter, setPartnerTypeFilter,
     selectedPartners, setSelectedPartners, selectedLeads, setSelectedLeads, selectedCommissions, setSelectedCommissions,
     settings, setSettings, notifyForm, setNotifyForm, bulkImportPartner, setBulkImportPartner,
-    load: refresh, flash, fail, toggleAll, bulkLeads, setTab, setSub, setInner,
-    onQuickLead: openQuickLead, onPartnerCreate: openPartnerCreate, onOpenLead: openLeadDetail,
+    load: refresh, flash, fail, toggleAll, bulkLeads, setTab, setSub, setInner, onTab: setTab,
+    onQuickLead: openQuickLead, openQuickLead, onPartnerCreate: openPartnerCreate, onOpenLead: openLeadDetail,
     openLeadDetail, viewPartnerDetail, deletePartner, resetPassword,
     setEditingPartner, setPartnerForm, setPartnerModal, setCommissionModal, setEditCommission,
   };
@@ -330,7 +391,10 @@ export default function AdminDashboard() {
       activeTab={tab}
       onTabChange={setTab}
       title={pageInfo.title}
-      badge={dashboard?.stats?.pendingPartners}
+      badge={attentionCount || dashboard?.stats?.pendingPartners || 0}
+      notificationItems={attentionItems}
+      onNotificationClick={(item) => setTab(item.tab, item.opts || {})}
+      onNotificationMarkAll={() => setTab('partners', { partnerFilter: 'pending' })}
       headerActions={(
         <div className="flex items-center gap-2">
           <button type="button" className="dm-btn-primary text-xs" onClick={() => openQuickLead()}><Plus className="h-3 w-3" /> Add Lead</button>

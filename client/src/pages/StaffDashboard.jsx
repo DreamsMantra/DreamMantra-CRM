@@ -99,6 +99,17 @@ export default function StaffDashboard() {
       activeTab={tab}
       onTabChange={setTab}
       title={`Dream Mantra · ${title}`}
+      badge={followUps.overdue?.length || 0}
+      notificationItems={followUps.overdue?.length > 0 ? [{
+        id: 'staff-overdue',
+        type: 'followups',
+        title: `${followUps.overdue.length} overdue follow-up(s)`,
+        desc: 'Open follow-ups to catch up',
+        tone: 'bg-red-50 text-red-700',
+        tab: 'follow-ups',
+      }] : []}
+      onNotificationClick={(item) => setTab(item.tab)}
+      onNotificationMarkAll={() => setTab('follow-ups')}
     >
       {msg && <p className="mb-4 text-sm text-emerald-600">{msg}</p>}
 

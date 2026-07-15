@@ -4,6 +4,7 @@ import {
   ClipboardList, Users, MessageSquare, Bell, Activity, RefreshCw, Plus,
 } from 'lucide-react';
 import BulkLeadImport from '../BulkLeadImport';
+import PartnerSelect from '../PartnerSelect';
 import { api } from '../../api';
 import ExportButton from '../ExportButton';
 import Modal from '../Modal';
@@ -200,10 +201,12 @@ export default function MasterControl({ token, onRefresh, flash, fail, partners 
         <div className="space-y-6">
           <div className="dm-card p-6">
             <h3 className="mb-4 font-display text-lg font-bold text-stone-900">Bulk Import Leads</h3>
-            <select className="dm-input mb-4 max-w-md" value={bulkPartner} onChange={(e) => setBulkPartner(e.target.value)}>
-              <option value="">Select partner for bulk import</option>
-              {partners.filter((p) => p.status === 'active').map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <PartnerSelect
+              value={bulkPartner}
+              onChange={setBulkPartner}
+              placeholder="Select partner for bulk import"
+              className="dm-input mb-1 max-w-md"
+            />
             <BulkLeadImport onImport={async (leadsData) => {
               if (!bulkPartner) { fail(new Error('Select a partner first')); return; }
               const res = await api.admin.bulkLeads(bulkPartner, leadsData);

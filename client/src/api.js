@@ -1,5 +1,15 @@
 const API_BASE = '/api';
 
+/** Build query string; skips null/undefined/empty so filters don't become "undefined". */
+function qs(params = {}) {
+  const clean = {};
+  Object.entries(params || {}).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '' || v === 'undefined' || v === 'null') return;
+    clean[k] = String(v);
+  });
+  return new URLSearchParams(clean).toString();
+}
+
 async function request(path, options = {}) {
   const token = localStorage.getItem('crm_token');
   const headers = {
@@ -32,7 +42,7 @@ export const api = {
 
   partner: {
     dashboard: () => request('/partner/dashboard'),
-    leads: (params = {}) => request(`/partner/leads?${new URLSearchParams(params)}`),
+    leads: (params = {}) => request(`/partner/leads?${qs(params)}`),
     createLead: (body) => request('/partner/leads', { method: 'POST', body: JSON.stringify(body) }),
     updateLead: (id, body) => request(`/partner/leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     getLead: (id) => request(`/partner/leads/${id}`),
@@ -48,7 +58,7 @@ export const api = {
     leaderboard: () => request('/partner/leaderboard'),
     followUps: () => request('/partner/follow-ups'),
     announcements: () => request('/partner/announcements'),
-    exportLeads: (params = {}) => `/api/partner/export/leads?${new URLSearchParams(params)}`,
+    exportLeads: (params = {}) => `/api/partner/export/leads?${qs(params)}`,
     payoutDetails: (body) => request('/partner/payout-details', { method: 'PUT', body: JSON.stringify(body) }),
     dismissWelcome: () => request('/partner/welcome-seen', { method: 'PATCH' }),
     franchiseHub: () => request('/partner/franchise-hub'),
@@ -67,7 +77,7 @@ export const api = {
     system: () => request('/admin/system'),
     duplicates: () => request('/admin/duplicates'),
 
-    partners: (params = {}) => request(`/admin/partners?${new URLSearchParams(params)}`),
+    partners: (params = {}) => request(`/admin/partners?${qs(params)}`),
     getPartner: (id) => request(`/admin/partners/${id}`),
     createPartner: (body) => request('/admin/partners', { method: 'POST', body: JSON.stringify(body) }),
     updatePartner: (id, body) => request(`/admin/partners/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
@@ -76,7 +86,8 @@ export const api = {
     recalculatePartner: (id) => request(`/admin/partners/${id}/recalculate`, { method: 'POST' }),
     bulkPartners: (ids, action, data) => request('/admin/partners/bulk', { method: 'POST', body: JSON.stringify({ ids, action, data }) }),
 
-    leads: (params = {}) => request(`/admin/leads?${new URLSearchParams(params)}`),
+    leads: (params = {}) => request(`/admin/leads?${qs(params)}`),
+    getLead: (id) => request(`/admin/leads/${id}`),
     createLead: (body) => request('/admin/leads', { method: 'POST', body: JSON.stringify(body) }),
     updateLead: (id, body) => request(`/admin/leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     editLead: (id, body) => request(`/admin/leads/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
@@ -87,7 +98,7 @@ export const api = {
     leadComments: (id) => request(`/admin/leads/${id}/comments`),
     addComment: (id, message, isInternal) => request(`/admin/leads/${id}/comments`, { method: 'POST', body: JSON.stringify({ message, isInternal }) }),
 
-    commissions: (params = {}) => request(`/admin/commissions?${new URLSearchParams(params)}`),
+    commissions: (params = {}) => request(`/admin/commissions?${qs(params)}`),
     createCommission: (body) => request('/admin/commissions', { method: 'POST', body: JSON.stringify(body) }),
     updateCommission: (id, body) => request(`/admin/commissions/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     deleteCommission: (id) => request(`/admin/commissions/${id}`, { method: 'DELETE' }),
@@ -107,7 +118,7 @@ export const api = {
     settings: () => request('/admin/settings'),
     updateSettings: (body) => request('/admin/settings', { method: 'PUT', body: JSON.stringify(body) }),
 
-    exportLeads: (params = {}) => `/api/admin/export/leads?${new URLSearchParams(params)}`,
+    exportLeads: (params = {}) => `/api/admin/export/leads?${qs(params)}`,
     exportPartners: () => '/api/admin/export/partners',
     exportCommissions: () => '/api/admin/export/commissions',
     exportRegistrations: (status = 'all') => `/api/admin/export/registrations?status=${status}`,
@@ -130,7 +141,7 @@ export const api = {
     deleteCustomForm: (id) => request(`/admin/forms/custom/${id}`, { method: 'DELETE' }),
 
     students: () => request('/admin/students'),
-    users: (params = {}) => request(`/admin/users?${new URLSearchParams(params)}`),
+    users: (params = {}) => request(`/admin/users?${qs(params)}`),
     createUser: (body) => request('/admin/users', { method: 'POST', body: JSON.stringify(body) }),
     updateUser: (id, body) => request(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
@@ -143,11 +154,11 @@ export const api = {
     updateTask: (id, body) => request(`/admin/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     deleteTask: (id) => request(`/admin/tasks/${id}`, { method: 'DELETE' }),
 
-    payments: (params = {}) => request(`/admin/payments?${new URLSearchParams(params)}`),
+    payments: (params = {}) => request(`/admin/payments?${qs(params)}`),
     createPayment: (body) => request('/admin/payments', { method: 'POST', body: JSON.stringify(body) }),
     updatePayment: (id, body) => request(`/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
-    payoutRequests: (params = {}) => request(`/admin/payout-requests?${new URLSearchParams(params)}`),
+    payoutRequests: (params = {}) => request(`/admin/payout-requests?${qs(params)}`),
     updatePayoutRequest: (id, body) => request(`/admin/payout-requests/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
     automations: () => request('/admin/automations'),
@@ -156,7 +167,8 @@ export const api = {
     deleteAutomation: (id) => request(`/admin/automations/${id}`, { method: 'DELETE' }),
 
     auditLog: (limit = 100) => request(`/admin/audit-log?limit=${limit}`),
-    calendar: (params = {}) => request(`/admin/calendar?${new URLSearchParams(params)}`),
+    calendar: (params = {}) => request(`/admin/calendar?${qs(params)}`),
+    createCalendarEvent: (body) => request('/admin/calendar', { method: 'POST', body: JSON.stringify(body) }),
     enterprise: () => request('/admin/enterprise'),
     teamMembers: (agencyId) => request(`/admin/team-members?agencyId=${agencyId || ''}`),
     createTeamMember: (body) => request('/admin/team-members', { method: 'POST', body: JSON.stringify(body) }),
@@ -165,7 +177,7 @@ export const api = {
 
   staff: {
     dashboard: () => request('/staff/dashboard'),
-    leads: (params = {}) => request(`/staff/leads?${new URLSearchParams(params)}`),
+    leads: (params = {}) => request(`/staff/leads?${qs(params)}`),
     students: () => request('/staff/students'),
     tasks: () => request('/staff/tasks'),
     createTask: (body) => request('/staff/tasks', { method: 'POST', body: JSON.stringify(body) }),

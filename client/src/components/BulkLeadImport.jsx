@@ -21,13 +21,13 @@ export default function BulkLeadImport({ onImport, loading }) {
     });
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     setError('');
     try {
       const leads = parseCSV(text);
-      onImport(leads);
+      await onImport(leads);
     } catch (e) {
-      setError(e.message);
+      setError(e.message || 'Import failed');
     }
   };
 

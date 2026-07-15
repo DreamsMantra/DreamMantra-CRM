@@ -22,8 +22,8 @@ export default function AdminTeamPanel({
       {innerSub === 'roles' && <RolesPermissions />}
       {innerSub === 'assignments' && <LeadAssignments leads={leads} staffUsers={staffUsers} onRefresh={load} />}
       {innerSub === 'tasks' && <TaskBoard staffUsers={staffUsers} embedded />}
-      {innerSub === 'calendar' && <CalendarView onSelectLead={openLeadDetail} embedded />}
-      {innerSub === 'messages' && <ChatMessenger isAdmin partners={partners} />}
+      {innerSub === 'calendar' && <CalendarView onSelectLead={openLeadDetail} leads={leads} embedded />}
+      {innerSub === 'messages' && <ChatMessenger isAdmin partners={partners} onPartnersRefresh={load} />}
     </DashboardSection>
   );
 }

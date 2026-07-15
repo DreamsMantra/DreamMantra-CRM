@@ -238,7 +238,27 @@ export default function PartnerDashboard() {
       activeTab={tab}
       onTabChange={setTab}
       title={getDashboardTitle('partner', user?.partnerType)}
-      badge={notifications.unread}
+      badge={notifications.unread || followUps.overdue?.length || 0}
+      notificationItems={[
+        ...(notifications.unread > 0 ? [{
+          id: 'partner-notifs',
+          type: 'leads',
+          title: `${notifications.unread} unread notification(s)`,
+          desc: 'Messages and system alerts',
+          tone: 'bg-amber-50 text-amber-700',
+          tab: 'notifications',
+        }] : []),
+        ...(followUps.overdue?.length > 0 ? [{
+          id: 'partner-overdue',
+          type: 'followups',
+          title: `${followUps.overdue.length} overdue follow-up(s)`,
+          desc: 'Open follow-ups to catch up',
+          tone: 'bg-red-50 text-red-700',
+          tab: 'follow-ups',
+        }] : []),
+      ]}
+      onNotificationClick={(item) => setTab(item.tab)}
+      onNotificationMarkAll={() => setTab('notifications')}
     >
       <AnnouncementBanner announcements={announcements} />
       {user?.welcomePending && (

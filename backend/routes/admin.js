@@ -285,6 +285,12 @@ router.get('/leads', (req, res) => {
   res.json({ leads: leads.map(db.populateLead), total: leads.length, page: 1, pages: 1 });
 });
 
+router.get('/leads/:id', (req, res) => {
+  const lead = db.getLeads().find((l) => l.id === req.params.id || l._id === req.params.id || l.leadId === req.params.id);
+  if (!lead) return res.status(404).json({ message: 'Lead not found' });
+  res.json({ lead: db.populateLead(lead) });
+});
+
 router.post('/leads', async (req, res) => {
   try {
     const { partnerId, ...leadData } = req.body;
@@ -343,7 +349,7 @@ router.patch('/leads/:id', async (req, res) => {
   if (status && status !== prevStatus) {
     updates.status = status;
     const history = [...(lead.statusHistory || [])];
-    history.push({
+    history.push({  
       status,
       note: note || `Status changed to ${status}`,
       updatedBy: req.user.id,
@@ -847,7 +853,8 @@ router.get('/roles', superAdminOnly, (_req, res) => {
 });
 
 router.put('/roles', superAdminOnly, (req, res) => {
-  const perms = db.updateRolePermissions(req.body.rolePermissions || req.body);
+  const incoming = req.body.rolePermissions != null ? req.body.rolePermissions : req.body;
+  const perms = db.updateRolePermissions(incoming, { replace: true });
   db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'roles_updated', entityType: 'settings' });
   res.json({ rolePermissions: perms });
 });
@@ -953,6 +960,25 @@ router.get('/audit-log', superAdminOnly, (req, res) => {
 // ─── Enterprise: Calendar ───
 router.get('/calendar', (req, res) => {
   res.json({ events: db.getCalendarEvents({ from: req.query.from, to: req.query.to }) });
+});
+
+router.post('/calendar', (req, res) => {
+  try {
+    const { type, title, date, leadId, notes } = req.body;
+    if (!title?.trim() || !date) return res.status(400).json({ message: 'Title and date are required' });
+    const event = db.createCalendarEvent({
+      type: type || 'task',
+      title: title.trim(),
+      date,
+      leadId,
+      notes,
+      createdBy: req.user.id,
+    });
+    db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'calendar_event_created', entityType: 'calendar', details: title });
+    res.status(201).json({ event });
+  } catch (err) {
+    res.status(400).json({ message: err.message || 'Failed to create event' });
+  }
 });
 
 // ─── Enterprise: Team members ───

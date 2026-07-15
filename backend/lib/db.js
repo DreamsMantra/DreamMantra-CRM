@@ -1014,9 +1014,11 @@ export function getRolePermissions() {
   return store.settings.rolePermissions || {};
 }
 
-export function updateRolePermissions(rolePermissions) {
+export function updateRolePermissions(rolePermissions, { replace = false } = {}) {
   const store = loadStore();
-  store.settings.rolePermissions = { ...(store.settings.rolePermissions || {}), ...rolePermissions };
+  store.settings.rolePermissions = replace
+    ? { ...(rolePermissions || {}) }
+    : { ...(store.settings.rolePermissions || {}), ...(rolePermissions || {}) };
   saveStore(store);
   return store.settings.rolePermissions;
 }
@@ -1352,19 +1354,89 @@ export function getCalendarEvents(filter = {}) {
   const leads = getLeads();
   leads.forEach((l) => {
     if (l.followUpDate) {
-      events.push({ id: `fu-${l.id}`, type: 'follow_up', title: `Follow-up: ${l.studentName}`, date: l.followUpDate, leadId: l.id, color: '#f59e0b' });
+      events.push({
+        id: `fu-${l.id}`,
+        type: 'follow_up',
+        title: `Follow-up: ${l.studentName || l.companyName || l.leadId}`,
+        date: l.followUpDate,
+        leadId: l.id,
+        color: '#f59e0b',
+      });
     }
   });
   getTasks().forEach((t) => {
-    if (t.dueDate) events.push({ id: `task-${t.id}`, type: 'task', title: t.title, date: t.dueDate, taskId: t.id, color: '#3b82f6' });
+    if (t.dueDate) {
+      events.push({ id: `task-${t.id}`, type: 'task', title: t.title, date: t.dueDate, taskId: t.id, color: '#3b82f6' });
+    }
   });
   getSessions().forEach((s) => {
-    if (s.scheduledAt) events.push({ id: `sess-${s.id}`, type: 'session', title: s.title || 'Counselling Session', date: s.scheduledAt, sessionId: s.id, color: '#8b5cf6' });
+    if (s.scheduledAt) {
+      events.push({
+        id: `sess-${s.id}`,
+        type: 'session',
+        title: s.title || 'Counselling Session',
+        date: s.scheduledAt,
+        sessionId: s.id,
+        color: '#8b5cf6',
+      });
+    }
   });
+  (loadStore().calendarNotes || []).forEach((n) => {
+    events.push({
+      id: `note-${n.id}`,
+      type: 'note',
+      title: n.title,
+      date: n.date,
+      notes: n.notes,
+      color: '#10b981',
+    });
+  });
+
   let filtered = events;
-  if (filter.from) filtered = filtered.filter((e) => e.date >= filter.from);
-  if (filter.to) filtered = filtered.filter((e) => e.date <= filter.to);
-  return filtered.sort((a, b) => a.date.localeCompare(b.date));
+  if (filter.from) filtered = filtered.filter((e) => String(e.date || '').slice(0, 10) >= filter.from);
+  if (filter.to) filtered = filtered.filter((e) => String(e.date || '').slice(0, 10) <= filter.to);
+  return filtered.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+export function createCalendarEvent({ type, title, date, leadId, notes, createdBy }) {
+  if (type === 'follow_up') {
+    if (!leadId) throw new Error('Select a lead for follow-up');
+    const lead = updateLead(leadId, { followUpDate: date, ...(notes ? { adminNotes: notes } : {}) });
+    if (!lead) throw new Error('Lead not found');
+    return {
+      id: `fu-${lead.id}`,
+      type: 'follow_up',
+      title: title || `Follow-up: ${lead.studentName || lead.companyName || lead.leadId}`,
+      date,
+      leadId: lead.id,
+    };
+  }
+
+  if (type === 'note') {
+    const store = loadStore();
+    if (!store.calendarNotes) store.calendarNotes = [];
+    const note = {
+      id: newId(),
+      title,
+      date,
+      notes: notes || '',
+      createdBy,
+      createdAt: now(),
+    };
+    store.calendarNotes.push(note);
+    saveStore(store);
+    return { id: `note-${note.id}`, type: 'note', title, date, notes };
+  }
+
+  // default: task
+  const task = createTask({
+    title,
+    dueDate: date,
+    notes: notes || '',
+    createdBy,
+    status: 'open',
+  });
+  return { id: `task-${task.id}`, type: 'task', title: task.title, date: task.dueDate, taskId: task.id };
 }
 
 export function deleteTask(id) {

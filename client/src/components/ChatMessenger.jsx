@@ -1,17 +1,18 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
-  Send, Paperclip, Image, FileText, Film, Music, Download, Search, Phone,
+  Send, Paperclip, Image, FileText, Film, Music, Download, Search, RefreshCw,
 } from 'lucide-react';
 import { api } from '../api';
-import { formatDate } from '../utils/constants';
-
-const API_BASE = '/api';
 
 function fileIcon(type) {
   if (type === 'image') return Image;
   if (type === 'video') return Film;
   if (type === 'audio') return Music;
   return FileText;
+}
+
+function isAdminSender(role) {
+  return role === 'admin' || role === 'super_admin';
 }
 
 function MessageBubble({ msg, isMine }) {
@@ -50,7 +51,7 @@ function MessageBubble({ msg, isMine }) {
   );
 }
 
-export default function ChatMessenger({ isAdmin, partners = [] }) {
+export default function ChatMessenger({ isAdmin, partners = [], onPartnersRefresh }) {
   const [inbox, setInbox] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -59,19 +60,54 @@ export default function ChatMessenger({ isAdmin, partners = [] }) {
   const [file, setFile] = useState(null);
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
   const fileRef = useRef(null);
 
   const loadInbox = useCallback(async () => {
-    const { inbox: list } = await api.messages.inbox();
-    setInbox(list);
-    if (isAdmin && !activeId && list.length) setActiveId(list[0].otherUserId);
-  }, [isAdmin, activeId]);
+    setLoading(true);
+    try {
+      const { inbox: list } = await api.messages.inbox();
+      let merged = list || [];
+
+      // Ensure newly created/updated partners always appear even before first message
+      if (isAdmin && partners?.length) {
+        const map = new Map(merged.map((c) => [c.otherUserId, c]));
+        partners.forEach((p) => {
+          const id = p.id || p._id;
+          if (!id) return;
+          if (!map.has(id)) {
+            map.set(id, {
+              otherUserId: id,
+              otherUserName: p.name,
+              otherUserRole: 'partner',
+              otherUserAvatar: p.name?.charAt(0) || 'P',
+              otherUserStatus: p.status,
+              lastMessage: 'Start conversation',
+              lastAt: p.createdAt || '',
+              unread: 0,
+            });
+          } else {
+            map.set(id, { ...map.get(id), otherUserName: p.name, otherUserStatus: p.status });
+          }
+        });
+        merged = Array.from(map.values()).sort((a, b) => String(b.lastAt || '').localeCompare(String(a.lastAt || '')));
+      }
+
+      setInbox(merged);
+      if (isAdmin && !activeId && merged.length) setActiveId(merged[0].otherUserId);
+    } catch {
+      /* keep previous */
+    } finally {
+      setLoading(false);
+    }
+  }, [isAdmin, activeId, partners]);
 
   const loadThread = useCallback(async (userId) => {
     if (!userId && isAdmin) return;
     const data = await api.messages.thread(userId);
-    setMessages(data.messages);
+    setMessages(data.messages || []);
     setOtherUser(data.otherUser);
     loadInbox();
   }, [isAdmin, loadInbox]);
@@ -91,13 +127,15 @@ export default function ChatMessenger({ isAdmin, partners = [] }) {
     const t = setInterval(() => {
       if (isAdmin && activeId) loadThread(activeId);
       else if (!isAdmin) loadThread();
+      else loadInbox();
     }, 8000);
     return () => clearInterval(t);
-  }, [activeId, isAdmin, loadThread]);
+  }, [activeId, isAdmin, loadThread, loadInbox]);
 
   const send = async (e) => {
     e?.preventDefault();
     if (!text.trim() && !file) return;
+    if (isAdmin && !activeId) return;
     setSending(true);
     try {
       await api.messages.send({
@@ -115,25 +153,50 @@ export default function ChatMessenger({ isAdmin, partners = [] }) {
     }
   };
 
-  const filteredInbox = inbox.filter((c) =>
-    !search || c.otherUserName?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredInbox = useMemo(() => inbox.filter((c) => {
+    const matchesSearch = !search || c.otherUserName?.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || c.otherUserStatus === statusFilter || (!c.otherUserStatus && statusFilter === 'all');
+    return matchesSearch && matchesStatus;
+  }), [inbox, search, statusFilter]);
+
+  const refreshAll = async () => {
+    await onPartnersRefresh?.();
+    await loadInbox();
+  };
 
   return (
     <div className="dm-card flex h-[calc(100vh-12rem)] min-h-[500px] overflow-hidden">
       {isAdmin && (
         <aside className="flex w-80 shrink-0 flex-col border-r border-stone-200 bg-stone-50">
           <div className="border-b border-stone-200 bg-gradient-to-r from-gold/10 to-orange/5 p-4">
-            <h2 className="font-display font-bold text-stone-900">Partner Messages</h2>
-            <p className="text-xs text-stone-500">WhatsApp-style chat with partners</p>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h2 className="font-display font-bold text-stone-900">Partner Messages</h2>
+                <p className="text-xs text-stone-500">{inbox.length} partners · live list</p>
+              </div>
+              <button type="button" className="dm-btn-ghost p-2" title="Refresh partners" onClick={refreshAll}>
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
-          <div className="border-b border-stone-200 p-3">
+          <div className="space-y-2 border-b border-stone-200 p-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
               <input className="dm-input py-2 pl-9 text-sm" placeholder="Search partners..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
+            <select className="dm-input py-1.5 text-xs" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">All partners</option>
+              <option value="active">Active</option>
+              <option value="pending">Pending</option>
+              <option value="suspended">Suspended</option>
+            </select>
           </div>
           <div className="flex-1 overflow-y-auto">
+            {filteredInbox.length === 0 && (
+              <p className="p-6 text-center text-sm text-stone-400">
+                {loading ? 'Loading…' : 'No partners found. Approve or create a partner first.'}
+              </p>
+            )}
             {filteredInbox.map((c) => (
               <button
                 key={c.otherUserId}
@@ -150,6 +213,9 @@ export default function ChatMessenger({ isAdmin, partners = [] }) {
                     {c.unread > 0 && <span className="rounded-full bg-orange px-2 py-0.5 text-[10px] font-bold text-white">{c.unread}</span>}
                   </div>
                   <p className="truncate text-xs text-stone-500">{c.lastMessage}</p>
+                  {c.otherUserStatus && (
+                    <p className="mt-0.5 text-[10px] capitalize text-stone-400">{c.otherUserStatus}</p>
+                  )}
                 </div>
               </button>
             ))}
@@ -173,7 +239,7 @@ export default function ChatMessenger({ isAdmin, partners = [] }) {
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
           {!isAdmin || activeId ? (
             messages.map((m) => (
-              <MessageBubble key={m.id} msg={m} isMine={m.senderRole === (isAdmin ? 'admin' : 'partner')} />
+              <MessageBubble key={m.id} msg={m} isMine={isAdmin ? isAdminSender(m.senderRole) : m.senderRole === 'partner'} />
             ))
           ) : (
             <div className="flex h-full items-center justify-center text-stone-400">Select a partner to start chatting</div>

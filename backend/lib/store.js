@@ -86,6 +86,7 @@ function normalizeStore(store) {
   if (!normalized.automations) normalized.automations = [];
   if (!normalized.auditLog) normalized.auditLog = [];
   if (!normalized.teamMembers) normalized.teamMembers = [];
+  if (!normalized.calendarNotes) normalized.calendarNotes = [];
   if (!normalized.settings) normalized.settings = { ...defaultStore.settings };
   if (!normalized.settings.customForms) normalized.settings.customForms = [];
   if (!normalized.settings.products) normalized.settings.products = defaultStore.settings.products;

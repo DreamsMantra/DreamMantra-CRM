@@ -12,8 +12,14 @@ import adminRoutes from './routes/admin.js';
 import staffRoutes from './routes/staff.js';
 import messagesRoutes from './routes/messages.js';
 import { UPLOAD_DIR } from './lib/upload.js';
+import { applySecurity, sanitizeInput } from './middleware/security.js';
 
 dotenv.config();
+
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev-secret-change-me')) {
+  console.error('✗ JWT_SECRET must be set to a strong value in production');
+  process.exit(1);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientDist = path.join(__dirname, '../client/dist');
@@ -28,9 +34,11 @@ const corsOrigins = process.env.CORS_ORIGIN
     ? true
     : ['http://localhost:5174', 'http://127.0.0.1:5174'];
 
+applySecurity(app);
 app.use(compression({ threshold: 1024 }));
 app.use(cors({ origin: corsOrigins, credentials: true }));
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(sanitizeInput);
 
 app.get('/api/health', (_req, res) => {
   const storage = getStorageInfo();
