@@ -1,7 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, X } from 'lucide-react';
+import { LogOut, Menu, X, LayoutDashboard } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { getDashboardPath } from '../config/roleNavigation';
 import Logo from './Logo';
 import NotificationBell from './NotificationBell';
 
@@ -13,6 +14,8 @@ export default function DashboardLayout({
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const dashboardPath = getDashboardPath(user?.role) || '/admin';
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -23,17 +26,18 @@ export default function DashboardLayout({
     setMobileOpen(false);
   };
 
+  const goDashboard = () => {
+    if (onTabChange) onTabChange('overview');
+    else navigate(dashboardPath);
+    setMobileOpen(false);
+  };
+
   const Sidebar = () => (
     <div className="flex h-full flex-col bg-white">
-      <button
-        type="button"
-        className="border-b border-stone-200 p-5 text-left transition hover:bg-stone-50"
-        onClick={() => handleNav('overview')}
-        title="Go to Home"
-      >
-        <Logo size="sm" />
+      <div className="border-b border-stone-200 p-4">
+        <Logo size="sm" to="/" />
         <p className="mt-2 text-xs font-medium text-stone-400">{title}</p>
-      </button>
+      </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
         {sidebarLinks.map((link) => {
           const tabKey = link.tab || 'overview';
@@ -104,12 +108,17 @@ export default function DashboardLayout({
       )}
 
       <div className="flex flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-stone-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
-          <button type="button" className="rounded-lg p-2 text-stone-600 hover:bg-stone-100 lg:hidden" onClick={() => setMobileOpen((o) => !o)} aria-label="Menu">
-            {mobileOpen ? <X /> : <Menu />}
-          </button>
-          <h1 className="font-display text-lg font-bold text-stone-900 lg:text-xl">{title}</h1>
-          <div className="flex items-center gap-2 sm:gap-3">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-stone-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <button type="button" className="rounded-lg p-2 text-stone-600 hover:bg-stone-100 lg:hidden" onClick={() => setMobileOpen((o) => !o)} aria-label="Menu">
+              {mobileOpen ? <X /> : <Menu />}
+            </button>
+            <div className="hidden shrink-0 border-r border-stone-200 pr-3 sm:block">
+              <Logo size="sm" to="/" />
+            </div>
+            <h1 className="truncate font-display text-lg font-bold text-stone-900 lg:text-xl">{title}</h1>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             {headerActions}
             {(notificationItems != null || badge > 0) && (
               <NotificationBell
@@ -119,7 +128,15 @@ export default function DashboardLayout({
                 onMarkAll={onNotificationMarkAll}
               />
             )}
-            <span className="hidden text-sm text-stone-400 xl:block">Dream Mantra CRM</span>
+            <button
+              type="button"
+              onClick={goDashboard}
+              className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-gold/15 hover:text-gold-dark"
+              title="Go to Dashboard"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" />
+              Dashboard
+            </button>
           </div>
         </header>
         <main className="flex-1 overflow-auto p-4 lg:p-8">{children}</main>

@@ -1,15 +1,21 @@
 import { Link } from 'react-router-dom';
 
-export default function Logo({ className = '', size = 'md' }) {
-  const sizes = { sm: 'text-lg', md: 'text-xl', lg: 'text-2xl' };
+/** Official Dream Mantra logo — always navigates to the public home page. */
+export default function Logo({ className = '', size = 'md', to = '/' }) {
+  const heights = { sm: 'h-8', md: 'h-10', lg: 'h-12' };
   return (
-    <Link to="/" className={`inline-flex items-center gap-2 font-display font-bold ${sizes[size]} ${className}`}>
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-orange text-lg shadow-md shadow-orange/20">
-        🎯
-      </span>
-      <span>
-        <span className="dm-gradient-text">Dream Mantra</span>
-        <span className="ml-1 text-xs font-semibold text-stone-400">CRM</span>
+    <Link
+      to={to}
+      className={`inline-flex items-center gap-2 ${className}`}
+      title="Dream Mantra — open website home"
+    >
+      <img
+        src="/logo/dream-mantra-logo.png"
+        alt="Dream Mantra"
+        className={`${heights[size] || heights.md} w-auto max-w-[180px] object-contain object-left`}
+      />
+      <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-500">
+        CRM
       </span>
     </Link>
   );

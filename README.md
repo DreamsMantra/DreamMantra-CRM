@@ -63,7 +63,7 @@ npm run dev
 
 Default admin (auto-created on first run):
 - Email: `admin@dreammantra.in`
-- Password: `Admin@123`
+- Password: `DreamMantra@2026`
 
 ### Or run backend & frontend separately
 

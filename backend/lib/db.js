@@ -143,17 +143,37 @@ export function updateUser(id, updates) {
 
 export async function seedAdmin() {
   const users = getUsers();
+  const email = (process.env.ADMIN_EMAIL || 'admin@dreammantra.in').toLowerCase();
+  // Migrate away from legacy Admin@123 even if old env still has it
+  const rawPassword = process.env.ADMIN_PASSWORD;
+  const password = (!rawPassword || rawPassword === 'Admin@123') ? 'DreamMantra@2026' : rawPassword;
+  const hash = await bcrypt.hash(password, 10);
+
   const legacyAdmin = users.find((u) => u.role === 'admin');
   if (legacyAdmin && legacyAdmin.role === 'admin') {
-    updateUser(legacyAdmin.id, { role: 'super_admin', permissions: getDefaultPermissions('super_admin') });
-    console.log(`✓ Upgraded admin to super_admin: ${legacyAdmin.email}`);
+    updateUser(legacyAdmin.id, {
+      role: 'super_admin',
+      permissions: getDefaultPermissions('super_admin'),
+      password: hash,
+      email: email || legacyAdmin.email,
+    });
+    console.log(`✓ Upgraded admin to super_admin and synced password: ${legacyAdmin.email}`);
     return findUser({ id: legacyAdmin.id });
   }
-  const existing = findUser({ role: 'super_admin' });
-  if (existing) return existing;
-  const email = (process.env.ADMIN_EMAIL || 'admin@dreammantra.in').toLowerCase();
-  const password = process.env.ADMIN_PASSWORD || 'Admin@123';
-  const hash = await bcrypt.hash(password, 10);
+
+  const existing = findUser({ role: 'super_admin' }) || findUser({ email });
+  if (existing) {
+    updateUser(existing.id, {
+      password: hash,
+      role: 'super_admin',
+      status: 'active',
+      permissions: getDefaultPermissions('super_admin'),
+      ...(existing.email !== email ? { email } : {}),
+    });
+    console.log(`✓ Super Admin password synced: ${existing.email || email}`);
+    return findUser({ id: existing.id });
+  }
+
   const admin = createUser({
     name: process.env.ADMIN_NAME || 'Dream Mantra Super Admin',
     email,

@@ -10,7 +10,7 @@ async function req(path, opts = {}) {
 const adminLogin = await req('/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email: 'admin@dreammantra.in', password: 'Admin@123' }),
+  body: JSON.stringify({ email: 'admin@dreammantra.in', password: 'DreamMantra@2026' }),
 });
 const adminH = { Authorization: `Bearer ${adminLogin.data.token}` };
 const partners = await req('/admin/partners?status=active', { headers: adminH });
