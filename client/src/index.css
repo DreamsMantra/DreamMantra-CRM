@@ -89,16 +89,26 @@
     @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-100 hover:text-stone-900;
   }
 
+  @media (max-width: 1023px) {
+    .dm-sidebar-link {
+      @apply py-3 text-[15px];
+    }
+  }
+
   .dm-sidebar-link-active {
     @apply border border-orange/30 bg-orange/15 font-bold text-orange shadow-sm;
   }
 
+  .dm-table-wrap {
+    @apply -mx-3 overflow-x-auto sm:mx-0;
+  }
+
   .dm-table th {
-    @apply bg-stone-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500;
+    @apply bg-stone-50 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500 sm:px-4;
   }
 
   .dm-table td {
-    @apply px-4 py-3 text-sm text-stone-700;
+    @apply px-3 py-3 text-sm text-stone-700 sm:px-4;
   }
 
   .dm-table tr {

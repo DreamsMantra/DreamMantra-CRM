@@ -1,6 +1,6 @@
 /** Lead segment: B2C students vs B2B business */
 
-export const ADMIN_TAB_IDS = ['overview', 'leads', 'partners', 'students', 'finance', 'reports', 'team', 'messages', 'settings'];
+export const ADMIN_TAB_IDS = ['overview', 'leads', 'partners', 'students', 'finance', 'reports', 'team', 'messages', 'tools', 'data', 'settings'];
 
 export const LEAD_TYPES = [
 
@@ -110,13 +110,15 @@ export const ADMIN_TAB_ALIASES = {
 
   pricing: { tab: 'settings', inner: 'pricing' },
 
-  master: { tab: 'settings', inner: 'tools' },
+  master: { tab: 'tools' },
 
-  data: { tab: 'settings', inner: 'tools' },
+  data: { tab: 'data' },
 
-  automations: { tab: 'settings', inner: 'tools' },
+  tools: { tab: 'tools' },
 
-  audit: { tab: 'settings', inner: 'tools' },
+  automations: { tab: 'tools' },
+
+  audit: { tab: 'data' },
 
   notify: { tab: 'settings', inner: 'general' },
 
@@ -162,8 +164,6 @@ export const ADMIN_SUB_TABS = {
 
     { id: 'pricing', label: 'Pricing' },
 
-    { id: 'tools', label: 'Tools & Data' },
-
   ],
 
 };
@@ -188,7 +188,11 @@ export const PAGE_TITLES = {
 
   messages: { title: 'Messages', desc: 'Chat with partners and team' },
 
-  settings: { title: 'Settings', desc: 'CRM configuration and tools' },
+  tools: { title: 'Tools', desc: 'Forms, bulk import, resources and automations' },
+
+  data: { title: 'Data', desc: 'Import, export, backups and audit log' },
+
+  settings: { title: 'Settings', desc: 'CRM configuration and pricing' },
 
 };
 

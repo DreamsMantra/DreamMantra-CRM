@@ -1,22 +1,25 @@
 import { Link } from 'react-router-dom';
 
-/** Official Dream Mantra logo — always navigates to the public home page. */
-export default function Logo({ className = '', size = 'md', to = '/' }) {
-  const heights = { sm: 'h-8', md: 'h-10', lg: 'h-12' };
+/** Official Dream Mantra logo — navigates to the public home page. */
+export default function Logo({ className = '', size = 'md', to = '/', showText = true }) {
+  const heights = { sm: 'h-12', md: 'h-16', lg: 'h-20' };
+  const textSizes = { sm: 'text-sm sm:text-base', md: 'text-base sm:text-lg', lg: 'text-lg sm:text-xl' };
   return (
     <Link
       to={to}
-      className={`inline-flex items-center gap-2 ${className}`}
-      title="Dream Mantra — open website home"
+      className={`inline-flex max-w-full items-center gap-3 ${className}`}
+      title="Dream Mantra CRM — open website home"
     >
       <img
         src="/logo/dream-mantra-logo.png"
-        alt="Dream Mantra"
-        className={`${heights[size] || heights.md} w-auto max-w-[180px] object-contain object-left`}
+        alt="Dream Mantra CRM"
+        className={`${heights[size] || heights.md} w-auto max-w-[min(260px,58vw)] object-contain object-left`}
       />
-      <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-500">
-        CRM
-      </span>
+      {showText && (
+        <span className={`min-w-0 font-display font-bold leading-tight ${textSizes[size] || textSizes.md}`}>
+          <span className="dm-gradient-text block truncate">Dreams Mantra CRM</span>
+        </span>
+      )}
     </Link>
   );
 }

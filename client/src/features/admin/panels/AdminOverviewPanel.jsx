@@ -73,7 +73,7 @@ export default function AdminOverviewPanel({
         <div className="grid gap-4 sm:grid-cols-3">
           <StatCard label="Open Tasks" value={enterprise.openTasks || 0} accent="blue" onClick={() => onTab?.('team', { inner: 'tasks' })} />
           <StatCard label="Pending Payouts" value={enterprise.pendingPayouts || 0} accent="gold" onClick={() => onTab?.('finance', { sub: 'payouts' })} />
-          <StatCard label="Automations" value={enterprise.automationCount || 0} accent="orange" onClick={() => onTab?.('settings', { inner: 'tools' })} />
+          <StatCard label="Automations" value={enterprise.automationCount || 0} accent="orange" onClick={() => onTab?.('tools')} />
         </div>
       )}
 

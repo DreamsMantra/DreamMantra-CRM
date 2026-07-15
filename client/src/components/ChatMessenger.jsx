@@ -128,7 +128,7 @@ export default function ChatMessenger({ isAdmin, partners = [], onPartnersRefres
       if (isAdmin && activeId) loadThread(activeId);
       else if (!isAdmin) loadThread();
       else loadInbox();
-    }, 8000);
+    }, 25000);
     return () => clearInterval(t);
   }, [activeId, isAdmin, loadThread, loadInbox]);
 

@@ -2,20 +2,12 @@ import { Send } from 'lucide-react';
 import DashboardSection from '../../../components/layout/DashboardSection';
 import SectionBlock from '../../../components/layout/SectionBlock';
 import ProductsPricing from '../../../components/admin/ProductsPricing';
-import PartnerResourcesAdmin from '../../../components/admin/PartnerResourcesAdmin';
-import MasterControl from '../../../components/admin/MasterControl';
-import BulkLeadImport from '../../../components/BulkLeadImport';
-import PartnerSelect from '../../../components/PartnerSelect';
-import ExportButton from '../../../components/ExportButton';
-import AutomationRules from '../../../components/admin/AutomationRules';
-import AuditLog from '../../../components/admin/AuditLog';
 import { ADMIN_SUB_TABS } from '../../../config/adminTabs';
 import { SETTINGS_FIELDS } from '../constants';
 import { api } from '../../../api';
 
 export default function AdminSettingsPanel({
-  pageInfo, innerSub, setInner, settings, setSettings, notifyForm, setNotifyForm,
-  token, load, flash, fail, partners, leads, openLeadDetail, bulkImportPartner, setBulkImportPartner,
+  pageInfo, innerSub, setInner, settings, setSettings, notifyForm, setNotifyForm, flash,
 }) {
   return (
     <DashboardSection
@@ -25,7 +17,7 @@ export default function AdminSettingsPanel({
       activeSub={innerSub}
       onSubChange={setInner}
     >
-      {innerSub === 'general' && (
+      {(innerSub === 'general' || !innerSub) && (
         <div className="space-y-6">
           <SectionBlock title="CRM Settings">
             <form onSubmit={async (e) => { e.preventDefault(); await api.admin.updateSettings(settings); flash('Settings saved'); }} className="mx-auto max-w-xl space-y-4">
@@ -44,7 +36,7 @@ export default function AdminSettingsPanel({
             <form onSubmit={async (e) => { e.preventDefault(); const res = await api.admin.notify(notifyForm); flash(`Sent to ${res.sent} partner(s)`); setNotifyForm({ partnerId: 'all', title: '', message: '', link: '' }); }} className="mx-auto max-w-xl space-y-4">
               <div><label className="dm-label">Title</label><input className="dm-input" value={notifyForm.title} onChange={(e) => setNotifyForm({ ...notifyForm, title: e.target.value })} required /></div>
               <div><label className="dm-label">Message</label><textarea className="dm-input min-h-[80px]" value={notifyForm.message} onChange={(e) => setNotifyForm({ ...notifyForm, message: e.target.value })} required /></div>
-              <button type="submit" className="dm-btn-primary w-full flex items-center justify-center gap-2"><Send className="h-4 w-4" /> Send</button>
+              <button type="submit" className="dm-btn-primary flex w-full items-center justify-center gap-2"><Send className="h-4 w-4" /> Send</button>
             </form>
           </SectionBlock>
         </div>
@@ -52,34 +44,6 @@ export default function AdminSettingsPanel({
       {innerSub === 'pricing' && (
         <div className="space-y-6">
           <ProductsPricing embedded />
-        </div>
-      )}
-      {innerSub === 'tools' && (
-        <div className="space-y-6">
-          <MasterControl token={token} onRefresh={load} flash={flash} fail={fail} partners={partners} leads={leads} onOpenLead={openLeadDetail} />
-          <SectionBlock title="Partner Resources" description="Share training, marketing, and product links with partners">
-            <PartnerResourcesAdmin embedded />
-          </SectionBlock>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <SectionBlock title="Import Leads">
-              <PartnerSelect
-                value={bulkImportPartner}
-                onChange={setBulkImportPartner}
-                placeholder="Select partner"
-                className="dm-input mb-1"
-              />
-              <BulkLeadImport onImport={async (leadsData) => { if (!bulkImportPartner) { fail(new Error('Select a partner')); return; } const res = await api.admin.bulkLeads(bulkImportPartner, leadsData); flash(`Imported ${res.created} leads`); load(); }} />
-            </SectionBlock>
-            <SectionBlock title="Export">
-              <div className="space-y-3">
-                <ExportButton href={api.admin.exportLeads()} token={token} label="Export Leads" />
-                <ExportButton href={api.admin.exportPartners()} token={token} label="Export Partners" />
-                <ExportButton href={api.admin.exportBackup()} token={token} label="Full Backup" />
-              </div>
-            </SectionBlock>
-          </div>
-          <AutomationRules embedded />
-          <AuditLog embedded />
         </div>
       )}
     </DashboardSection>

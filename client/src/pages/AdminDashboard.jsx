@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, CheckCircle, AlertCircle } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
@@ -20,6 +20,17 @@ import AdminSettingsPanel from '../features/admin/panels/AdminSettingsPanel';
 import AdminModals from '../features/admin/AdminModals';
 import ChatMessenger from '../components/ChatMessenger';
 import { playDuplicateBuzz } from '../utils/duplicateBuzz';
+
+const AdminToolsPanel = lazy(() => import('../features/admin/panels/AdminToolsPanel'));
+const AdminDataPanel = lazy(() => import('../features/admin/panels/AdminDataPanel'));
+
+function PanelFallback() {
+  return (
+    <div className="dm-card flex min-h-[12rem] items-center justify-center p-8 text-sm text-stone-500">
+      Loading…
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const { user, token } = useAuth();
@@ -177,20 +188,20 @@ export default function AdminDashboard() {
     try {
       const tasks = [];
 
-      // Always keep dashboard badges fresh on main work tabs
-      if (forceAll || ['overview', 'leads', 'partners', 'students', 'finance', 'reports'].includes(tab)) {
+      // Keep badge counts fresh without reloading heavy lists on every tab
+      if (forceAll || ['overview', 'leads', 'partners', 'students', 'finance', 'reports', 'tools', 'data'].includes(tab)) {
         tasks.push(safe(() => api.admin.dashboard(), null).then((d) => { if (d) setDashboard(d); }));
         tasks.push(safe(() => api.admin.followUps(), { overdue: [], upcoming: [], today: [] }).then(setFollowUps));
       }
 
-      if (forceAll || ['overview', 'partners', 'leads', 'finance', 'team', 'settings', 'students', 'messages'].includes(tab)) {
+      if (forceAll || ['partners', 'leads', 'finance', 'team', 'tools', 'data', 'students', 'messages'].includes(tab)) {
         const partnerParams = { status: tab === 'partners' ? partnerFilter : 'all', partnerType: tab === 'partners' ? partnerTypeFilter : 'all' };
         if (tab === 'partners' && searchQuery) partnerParams.search = searchQuery;
         tasks.push(safe(() => api.admin.partners(partnerParams), { partners: [] })
           .then((d) => setPartners(d.partners || [])));
       }
 
-      if (forceAll || ['overview', 'leads', 'students', 'team', 'finance', 'settings'].includes(tab)) {
+      if (forceAll || ['leads', 'students', 'team', 'finance', 'tools'].includes(tab)) {
         const leadTypeParam = tab === 'leads' && leadTypeFilter !== 'all' ? leadTypeFilter : undefined;
         tasks.push(safe(() => api.admin.leads({
           status: tab === 'leads' ? leadFilter : 'all',
@@ -201,7 +212,7 @@ export default function AdminDashboard() {
         }), { leads: [] }).then((d) => setLeads(d.leads || [])));
       }
 
-      if (forceAll || tab === 'leads') {
+      if (forceAll || tab === 'leads' || tab === 'overview') {
         tasks.push(safe(() => api.admin.duplicates(), { groups: [] }).then((d) => setDuplicates(d.groups || [])));
       }
 
@@ -209,13 +220,13 @@ export default function AdminDashboard() {
         tasks.push(safe(() => api.admin.commissions(), { commissions: [] }).then((d) => setCommissions(d.commissions || [])));
       }
 
-      if (forceAll || tab === 'reports' || tab === 'overview') {
+      if (forceAll || tab === 'reports') {
         tasks.push(safe(() => api.admin.reports(), null).then((r) => { if (r) setReports(r); }));
       }
       if (forceAll || tab === 'overview') {
         tasks.push(safe(() => api.admin.activity(), { activities: [] }).then((a) => setActivities(a.activities || [])));
       }
-      if (forceAll || tab === 'settings') {
+      if (forceAll || tab === 'settings' || tab === 'tools') {
         tasks.push(safe(() => api.admin.system(), { settings: {}, stats: {} }).then((sys) => setSettings(sys.settings || {})));
       }
       if (user?.role === 'super_admin' && (forceAll || tab === 'overview' || tab === 'team' || tab === 'students')) {
@@ -434,6 +445,16 @@ export default function AdminDashboard() {
         <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
           <ChatMessenger isAdmin partners={partners} onPartnersRefresh={refresh} />
         </DashboardSection>
+      )}
+      {tab === 'tools' && (
+        <Suspense fallback={<PanelFallback />}>
+          <AdminToolsPanel {...panelProps} />
+        </Suspense>
+      )}
+      {tab === 'data' && (
+        <Suspense fallback={<PanelFallback />}>
+          <AdminDataPanel {...panelProps} />
+        </Suspense>
       )}
       {tab === 'settings' && <AdminSettingsPanel {...panelProps} />}
 
