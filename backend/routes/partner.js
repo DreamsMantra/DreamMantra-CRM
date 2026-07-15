@@ -97,8 +97,8 @@ router.post('/leads', activePartnerOnly, async (req, res) => {
       });
     }
 
-    let leadId = generateLeadId();
-    while (db.getLeads().find((l) => l.leadId === leadId)) leadId = generateLeadId();
+    let leadId = generateLeadId(normalized.leadType);
+    while (db.getLeads().find((l) => l.leadId === leadId)) leadId = generateLeadId(normalized.leadType);
 
     const lead = db.createLead({
       ...normalized,

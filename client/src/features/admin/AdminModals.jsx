@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Modal from '../../components/Modal';
 import LeadForm from '../../components/LeadForm';
 import LeadComments from '../../components/LeadComments';
@@ -94,7 +94,7 @@ export default function AdminModals({
   return (
     <>
       {/* ─── MODALS ─── */}
-      <PartnerDetailModal partner={viewPartner} detail={partnerDetail} open={!!viewPartner} onClose={() => { setViewPartner(null); setPartnerDetail(null); }} onSave={savePartnerFromDetail} />
+      <PartnerDetailModal partner={viewPartner} detail={partnerDetail} open={false} onClose={() => { setViewPartner(null); setPartnerDetail(null); }} onSave={savePartnerFromDetail} />
 
       <CredentialsModal
         open={!!credentialsData}
@@ -159,7 +159,10 @@ export default function AdminModals({
               });
             }}>{PARTNER_TYPES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select></div>
             <div><label className="dm-label">Tier</label><select className="dm-input" value={partnerForm.tier} onChange={(e) => setPartnerForm({ ...partnerForm, tier: e.target.value })}>{PARTNER_TIERS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-            <div><label className="dm-label">Commission %</label><input type="number" className="dm-input" value={partnerForm.commissionRate} onChange={(e) => setPartnerForm({ ...partnerForm, commissionRate: Number(e.target.value) })} /></div>
+            <div className="sm:col-span-2 rounded-lg border border-amber-100 bg-amber-50/50 p-3 text-xs text-amber-900">
+              Commission is now <strong>per product</strong> on the partner profile (Products &amp; rates). Fixed % below is legacy fallback only.
+            </div>
+            <div><label className="dm-label">Legacy Commission % (fallback)</label><input type="number" className="dm-input" value={partnerForm.commissionRate} onChange={(e) => setPartnerForm({ ...partnerForm, commissionRate: Number(e.target.value) })} /></div>
             <div><label className="dm-label">Status</label><select className="dm-input" value={partnerForm.status} onChange={(e) => setPartnerForm({ ...partnerForm, status: e.target.value })}>{['pending', 'active', 'suspended', 'rejected'].map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
             {partnerForm.partnerType === 'agency' && (
               <>
@@ -178,7 +181,7 @@ export default function AdminModals({
         </form>
       </Modal>
 
-      <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Dreamz ID ${selectedLead?.leadId}`} wide>
+      <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Lead ID ${selectedLead?.leadId}`} wide>
         {selectedLead && (
           <div className="space-y-5">
             <div className="flex flex-wrap gap-2">
@@ -194,6 +197,11 @@ export default function AdminModals({
             </div>
             <div><label className="dm-label">Status Note</label><input className="dm-input" value={leadUpdate.note} onChange={(e) => setLeadUpdate({ ...leadUpdate, note: e.target.value })} /></div>
             <div><label className="dm-label">Admin Notes (partner sees)</label><textarea className="dm-input" value={leadUpdate.adminNotes} onChange={(e) => setLeadUpdate({ ...leadUpdate, adminNotes: e.target.value })} /></div>
+
+            <details className="rounded-xl border border-stone-200 p-4" open>
+              <summary className="cursor-pointer font-semibold text-stone-800">Product rates for this lead</summary>
+              <LeadProductRates lead={selectedLead} flash={flash} />
+            </details>
 
             <details className="rounded-xl border border-stone-200 p-4" open>
               <summary className="cursor-pointer font-semibold text-stone-800">Edit Full Lead Details</summary>
@@ -258,7 +266,7 @@ export default function AdminModals({
       <Modal open={commissionModal} onClose={() => setCommissionModal(false)} title="Add Manual Commission">
         <form onSubmit={async (e) => { e.preventDefault(); await api.admin.createCommission(commissionForm); setCommissionModal(false); flash('Commission added'); load(); }} className="space-y-4">
           <div><label className="dm-label">Partner</label><select className="dm-input" value={commissionForm.partnerId} onChange={(e) => setCommissionForm({ ...commissionForm, partnerId: e.target.value })} required>{partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
-          <div><label className="dm-label">Dreamz ID</label><select className="dm-input" value={commissionForm.leadId} onChange={(e) => setCommissionForm({ ...commissionForm, leadId: e.target.value })} required>{leads.map((l) => <option key={l.id || l._id} value={l.id || l._id}>{l.leadId} — {leadDisplayName(l)}</option>)}</select></div>
+          <div><label className="dm-label">Lead ID</label><select className="dm-input" value={commissionForm.leadId} onChange={(e) => setCommissionForm({ ...commissionForm, leadId: e.target.value })} required>{leads.map((l) => <option key={l.id || l._id} value={l.id || l._id}>{l.leadId} — {leadDisplayName(l)}</option>)}</select></div>
           <div><label className="dm-label">Amount ₹</label><input type="number" className="dm-input" value={commissionForm.amount} onChange={(e) => setCommissionForm({ ...commissionForm, amount: e.target.value })} required /></div>
           <div><label className="dm-label">Notes</label><input className="dm-input" value={commissionForm.notes} onChange={(e) => setCommissionForm({ ...commissionForm, notes: e.target.value })} /></div>
           <button type="submit" className="dm-btn-primary w-full">Create Commission</button>
@@ -287,5 +295,83 @@ export default function AdminModals({
         )}
       </Modal>
     </>
+  );
+}
+
+function LeadProductRates({ lead, flash }) {
+  const [products, setProducts] = useState([]);
+  const [overrides, setOverrides] = useState([]);
+  const [drafts, setDrafts] = useState({});
+  const leadId = lead?.id || lead?._id;
+
+  useEffect(() => {
+    if (!leadId) return;
+    Promise.all([
+      api.admin.products(),
+      api.admin.productRateOverrides({ scope: 'lead', entityId: leadId }),
+    ]).then(([p, o]) => {
+      const list = p.products || [];
+      setProducts(list);
+      setOverrides(o.overrides || []);
+      const d = {};
+      list.forEach((prod) => {
+        const ov = (o.overrides || []).find((x) => x.productId === prod.id);
+        d[prod.id] = {
+          salePrice: ov?.salePrice ?? prod.price,
+          commissionType: ov?.commission?.type || prod.commission?.type || 'fixed',
+          commissionValue: ov?.commission?.value ?? prod.commission?.value ?? 0,
+        };
+      });
+      setDrafts(d);
+    }).catch(() => {});
+  }, [leadId]);
+
+  const save = async (productId) => {
+    const d = drafts[productId];
+    await api.admin.upsertProductRateOverride({
+      scope: 'lead',
+      entityId: leadId,
+      productId,
+      salePrice: Number(d.salePrice),
+      listPrice: Number(d.salePrice),
+      commission: { type: d.commissionType, value: Number(d.commissionValue) },
+    });
+    flash?.('Lead product rate saved');
+  };
+
+  if (!products.length) return <p className="mt-2 text-sm text-stone-400">No products.</p>;
+
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-xs text-stone-500">Override catalogue price/commission for this {lead?.leadType === 'business' ? 'potential partner' : 'potential student'}.</p>
+      {products.map((prod) => {
+        const d = drafts[prod.id] || {};
+        const hasOv = overrides.some((o) => o.productId === prod.id);
+        return (
+          <div key={prod.id} className="grid gap-2 rounded-lg bg-stone-50 p-2 sm:grid-cols-5 sm:items-end">
+            <div>
+              <p className="text-sm font-medium">{prod.label}</p>
+              <p className="text-[10px] text-stone-400">{hasOv ? 'Custom' : `Catalogue ₹${prod.price}`}</p>
+            </div>
+            <div>
+              <label className="dm-label">Sale ₹</label>
+              <input type="number" className="dm-input" value={d.salePrice ?? ''} onChange={(e) => setDrafts({ ...drafts, [prod.id]: { ...d, salePrice: e.target.value } })} />
+            </div>
+            <div>
+              <label className="dm-label">Type</label>
+              <select className="dm-input" value={d.commissionType || 'fixed'} onChange={(e) => setDrafts({ ...drafts, [prod.id]: { ...d, commissionType: e.target.value } })}>
+                <option value="fixed">Fixed</option>
+                <option value="percentage">%</option>
+              </select>
+            </div>
+            <div>
+              <label className="dm-label">Value</label>
+              <input type="number" className="dm-input" value={d.commissionValue ?? ''} onChange={(e) => setDrafts({ ...drafts, [prod.id]: { ...d, commissionValue: e.target.value } })} />
+            </div>
+            <button type="button" className="dm-btn-ghost text-xs" onClick={() => save(prod.id)}>Save</button>
+          </div>
+        );
+      })}
+    </div>
   );
 }

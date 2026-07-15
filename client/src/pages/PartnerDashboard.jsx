@@ -377,13 +377,13 @@ export default function PartnerDashboard() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <button type="button" onClick={() => { setLeadForm({ ...emptyLeadForm, leadType: 'student' }); setLeadModal(true); }} className="dm-card p-5 text-left hover:border-orange/40 hover:shadow-md transition">
                   <Plus className="mb-2 h-6 w-6 text-orange" />
-                  <p className="font-semibold">Add Student Lead</p>
-                  <p className="text-xs text-stone-500">Quick Students (B2C) — name & phone</p>
+                  <p className="font-semibold">Add Potential Student</p>
+                  <p className="text-xs text-stone-500">B2C — name & phone</p>
                 </button>
                 <button type="button" onClick={() => { setLeadForm({ ...emptyLeadForm, leadType: 'business' }); setLeadModal(true); }} className="dm-card p-5 text-left hover:border-indigo-300 hover:shadow-md transition">
                   <Plus className="mb-2 h-6 w-6 text-indigo-600" />
-                  <p className="font-semibold">Add Business Lead</p>
-                  <p className="text-xs text-stone-500">School / college / Partners (B2B)</p>
+                  <p className="font-semibold">Add Potential Partner</p>
+                  <p className="text-xs text-stone-500">School / college / B2B</p>
                 </button>
               </div>
 
@@ -394,7 +394,7 @@ export default function PartnerDashboard() {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="dm-table w-full">
-                    <thead><tr><th>Dreamz ID</th><th>Student</th><th>Status</th><th>Date</th></tr></thead>
+                    <thead><tr><th>Lead ID</th><th>Student</th><th>Status</th><th>Date</th></tr></thead>
                     <tbody>
                       {(dashboard?.recentLeads || []).map((lead) => (
                         <tr key={lead.id || lead._id} className="cursor-pointer" onClick={() => openLead(lead)}>
@@ -447,12 +447,12 @@ export default function PartnerDashboard() {
           </div>
           <div className="dm-card overflow-x-auto">
             <table className="dm-table w-full">
-              <thead><tr><th>Dreamz ID</th><th>Type</th><th>Name / Contact</th><th>Phone</th><th>Class / Org</th><th>Status</th><th>Priority</th><th>Updated</th></tr></thead>
+              <thead><tr><th>Lead ID</th><th>Type</th><th>Name / Contact</th><th>Phone</th><th>Class / Org</th><th>Status</th><th>Priority</th><th>Updated</th></tr></thead>
               <tbody>
                 {leads.map((lead) => (
                   <tr key={lead.id || lead._id} className="cursor-pointer" onClick={() => openLead(lead)}>
                     <td className="font-mono text-gold-dark">{lead.leadId}</td>
-                    <td><span className={`dm-badge text-xs ${lead.leadType === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>{lead.leadType === 'business' ? 'Partners (B2B)' : 'Students (B2C)'}</span></td>
+                    <td><span className={`dm-badge text-xs ${lead.leadType === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>{lead.leadType === 'business' ? (['completed','converted'].includes(lead.status) ? 'Partner' : 'Potential Partner') : (['completed','converted'].includes(lead.status) ? 'Student' : 'Potential Student')}</span></td>
                     <td className="font-medium">{leadDisplayName(lead)}</td>
                     <td>{leadDisplayPhone(lead)}</td>
                     <td>{lead.leadType === 'business' ? (lead.businessType || '—') : (lead.classGrade || '—')}</td>
@@ -621,7 +621,7 @@ export default function PartnerDashboard() {
         <div className="dm-card overflow-x-auto">
           <h2 className="dm-section-title p-4 pb-0">Student Status</h2>
           <table className="dm-table w-full mt-4">
-            <thead><tr><th>Dreamz ID</th><th>Student</th><th>Class</th><th>Status</th><th>Updated</th></tr></thead>
+            <thead><tr><th>Lead ID</th><th>Student</th><th>Class</th><th>Status</th><th>Updated</th></tr></thead>
             <tbody>
               {leads.map((l) => (
                 <tr key={l.id} className="cursor-pointer hover:bg-stone-50" onClick={() => openLead(l)}>
@@ -763,7 +763,7 @@ export default function PartnerDashboard() {
         />
       </Modal>
 
-      <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Dreamz ID ${selectedLead?.leadId}`} wide>
+      <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title={`Lead ID ${selectedLead?.leadId}`} wide>
         {selectedLead && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">

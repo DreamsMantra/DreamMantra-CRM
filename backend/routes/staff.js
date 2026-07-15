@@ -107,6 +107,36 @@ router.get('/follow-ups', (req, res) => {
   res.json(db.getFollowUpBuckets(leadScopeFilter(req.user)));
 });
 
+/** Sales can set per-lead/product price & commission overrides */
+router.get('/product-rate-overrides', (req, res) => {
+  const { entityId, scope = 'lead' } = req.query;
+  if (scope === 'lead' && entityId) {
+    const lead = db.findLead(entityId);
+    if (!canAccessLead(req.user, lead) && req.user.role !== 'report_management') {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+  }
+  res.json({ overrides: db.getProductRateOverrides(req.query) });
+});
+
+router.post('/product-rate-overrides', (req, res) => {
+  try {
+    const scope = req.body.scope === 'partner' ? 'partner' : 'lead';
+    if (scope === 'lead') {
+      const lead = db.findLead(req.body.entityId);
+      if (!canAccessLead(req.user, lead) && req.user.role !== 'report_management') {
+        return res.status(404).json({ message: 'Lead not found' });
+      }
+    } else if (req.user.role !== 'sales_executive' && req.user.role !== 'report_management') {
+      return res.status(403).json({ message: 'Not allowed' });
+    }
+    const override = db.upsertProductRateOverride({ ...req.body, scope });
+    res.status(201).json({ override });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 router.patch('/leads/:id', async (req, res) => {
   const lead = db.findLead(req.params.id);
   if (!canAccessLead(req.user, lead)) {

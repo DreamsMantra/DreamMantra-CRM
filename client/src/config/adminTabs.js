@@ -4,9 +4,9 @@ export const ADMIN_TAB_IDS = ['overview', 'leads', 'partners', 'students', 'fina
 
 export const LEAD_TYPES = [
 
-  { value: 'student', label: 'Students (B2C)', short: 'Students (B2C)' },
+  { value: 'student', label: 'Potential Student (B2C)', short: 'Potential Student', converted: 'Student' },
 
-  { value: 'business', label: 'Partners (B2B)', short: 'Partners (B2B)' },
+  { value: 'business', label: 'Potential Partner (B2B)', short: 'Potential Partner', converted: 'Partner' },
 
 ];
 
@@ -34,7 +34,21 @@ export const BUSINESS_TYPES = [
 
 export function leadTypeLabel(type) {
 
-  return LEAD_TYPES.find((t) => t.value === type)?.label || (type === 'business' ? 'Partners (B2B)' : 'Students (B2C)');
+  return LEAD_TYPES.find((t) => t.value === type)?.label || (type === 'business' ? 'Potential Partner (B2B)' : 'Potential Student (B2C)');
+
+}
+
+
+
+/** Pipeline vs converted naming for a lead */
+
+export function leadLifecycleLabel(lead) {
+
+  const type = lead?.leadType || 'student';
+  const meta = LEAD_TYPES.find((t) => t.value === type);
+  const done = ['completed', 'converted'].includes(lead?.status);
+  if (done) return meta?.converted || (type === 'business' ? 'Partner' : 'Student');
+  return meta?.short || (type === 'business' ? 'Potential Partner' : 'Potential Student');
 
 }
 
@@ -176,9 +190,9 @@ export const PAGE_TITLES = {
 
   leads: { title: 'Leads', desc: 'All student & business leads' },
 
-  partners: { title: 'Partners', desc: 'Partner accounts and agencies' },
+  partners: { title: 'Partner Accounts', desc: 'Referral partner logins — click a name for full profile' },
 
-  students: { title: 'Students', desc: 'Enrolled students and counselling' },
+  students: { title: 'Students', desc: 'Converted B2C students and counselling' },
 
   finance: { title: 'Money', desc: 'Commissions, payments and payouts' },
 

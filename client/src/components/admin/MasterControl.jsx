@@ -220,7 +220,7 @@ export default function MasterControl({ token, onRefresh, flash, fail, partners 
               <ExportButton href={api.admin.exportLeads()} token={token} label="Download All" />
             </div>
             <table className="dm-table w-full">
-              <thead><tr><th>Dreamz ID</th><th>Student</th><th>Phone</th><th>Partner</th><th>Status</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Lead ID</th><th>Student</th><th>Phone</th><th>Partner</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
                 {leads.slice(0, 50).map((l) => (
                   <tr key={l.id || l._id}>

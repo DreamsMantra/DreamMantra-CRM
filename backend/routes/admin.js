@@ -307,8 +307,8 @@ router.post('/leads', async (req, res) => {
 
     const normalized = normalizeLeadInput(leadData);
 
-    let leadId = generateLeadId();
-    while (db.getLeads().find((l) => l.leadId === leadId)) leadId = generateLeadId();
+    let leadId = generateLeadId(normalized.leadType);
+    while (db.getLeads().find((l) => l.leadId === leadId)) leadId = generateLeadId(normalized.leadType);
 
     const lead = db.createLead({
       ...normalized,
@@ -374,21 +374,24 @@ router.patch('/leads/:id', async (req, res) => {
       meta: { leadId: lead.id, status },
     });
 
-    if (status === 'converted' && prevStatus !== 'converted') {
+    if ((status === 'converted' || status === 'completed') && prevStatus !== 'converted' && prevStatus !== 'completed') {
       db.updateUser(lead.partnerId, { convertedLeads: (partner.convertedLeads || 0) + 1 });
-      const amount = commissionAmount ?? Math.round((expectedValue || lead.expectedValue || 5000) * ((partner.commissionRate || 10) / 100));
+      const amount = commissionAmount != null
+        ? Number(commissionAmount)
+        : db.computeCommissionAmount({ ...lead, expectedValue: expectedValue ?? lead.expectedValue }, partner);
       updates.commissionAmount = amount;
       const commission = db.createCommission({
         partnerId: lead.partnerId,
         leadId: lead.id,
         amount,
-        rate: partner.commissionRate || 10,
+        rate: 0,
+        notes: 'Auto from product rates on convert',
         status: 'pending',
         createdBy: req.user.id,
       });
       await notifyUser(lead.partnerId, {
         title: 'Commission earned!',
-        message: `₹${amount} commission pending for converted lead ${lead.studentName}`,
+        message: `₹${amount} commission pending for converted lead ${lead.studentName || lead.companyName}`,
         type: 'commission',
         link: '/partner?tab=commissions',
         meta: { commissionId: commission.id },
@@ -509,10 +512,15 @@ router.patch('/commissions/:id', async (req, res) => {
 
 router.post('/commissions', (req, res) => {
   const { partnerId, leadId, amount, rate, notes } = req.body;
-  if (!partnerId || !leadId || !amount) return res.status(400).json({ message: 'partnerId, leadId, amount required' });
+  if (!partnerId || !amount) return res.status(400).json({ message: 'partnerId and amount required' });
   const commission = db.createCommission({
-    partnerId, leadId, amount: Number(amount), rate: Number(rate) || 10,
-    status: 'pending', notes: notes || '', createdBy: req.user.id,
+    partnerId,
+    leadId: leadId || null,
+    amount: Number(amount),
+    rate: Number(rate) || 0,
+    status: 'pending',
+    notes: notes || '',
+    createdBy: req.user.id,
   });
   notifyUser(partnerId, { title: 'Commission added', message: `₹${amount} commission added by admin.`, type: 'commission', link: '/partner?tab=commissions' });
   db.logActivity({ userId: req.user.id, userName: req.user.name, action: 'commission_created', entityType: 'commission', entityId: commission.id });
@@ -942,9 +950,13 @@ router.get('/rates', (req, res) => {
   res.json({ rates: db.getRates(req.query) });
 });
 
-router.post('/rates', superAdminOnly, (req, res) => {
+router.post('/rates', (req, res) => {
   const { productId, audience, listPrice, salePrice, partnerId, id } = req.body;
   if (!productId) return res.status(400).json({ message: 'productId required' });
+  // Global catalogue price rows without partnerId: Super Admin only
+  if (!partnerId && req.user.role !== 'super_admin') {
+    return res.status(403).json({ message: 'Super Admin required for catalogue rates' });
+  }
   const rate = db.upsertRate({ id, productId, audience, listPrice, salePrice, partnerId });
   db.logActivity({
     userId: req.user.id,
@@ -966,6 +978,34 @@ router.delete('/rates/:id', superAdminOnly, (req, res) => {
     entityType: 'settings',
     entityId: req.params.id,
   });
+  res.json({ ok: true });
+});
+
+// ─── Per-entity product rate overrides (partner or lead) ───
+router.get('/product-rate-overrides', (req, res) => {
+  res.json({ overrides: db.getProductRateOverrides(req.query) });
+});
+
+router.post('/product-rate-overrides', (req, res) => {
+  try {
+    const override = db.upsertProductRateOverride(req.body);
+    db.logActivity({
+      userId: req.user.id,
+      userName: req.user.name,
+      action: 'product_rate_override',
+      entityType: req.body.scope || 'partner',
+      entityId: override.entityId,
+      details: override.productId,
+    });
+    res.status(201).json({ override });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.delete('/product-rate-overrides/:id', (req, res) => {
+  const removed = db.deleteProductRateOverride(req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Override not found' });
   res.json({ ok: true });
 });
 

@@ -35,7 +35,9 @@ export function generateAgencyCode(territory = 'DM') {
   return `AGY-${prefix}${nanoid(5).toUpperCase()}`;
 }
 
-export function generateLeadId() {
-  const year = new Date().getFullYear();
-  return `DM-${year}-${nanoid(6).toUpperCase()}`;
+/** Random Lead ID: s783936 (student/B2C) or p740870 (business/B2B). Unique checked by callers. */
+export function generateLeadId(leadType = 'student') {
+  const prefix = leadType === 'business' ? 'p' : 's';
+  const digits = String(Math.floor(100000 + Math.random() * 900000));
+  return `${prefix}${digits}`;
 }

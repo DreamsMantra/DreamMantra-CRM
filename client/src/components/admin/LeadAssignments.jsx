@@ -45,7 +45,7 @@ export default function LeadAssignments({ leads = [], staffUsers = [], onRefresh
         <table className="dm-table w-full">
           <thead>
             <tr>
-              <th>Dreamz ID</th><th>Contact</th><th>Status</th><th>Sales</th><th>Counsellor</th>
+              <th>Lead ID</th><th>Contact</th><th>Status</th><th>Sales</th><th>Counsellor</th>
             </tr>
           </thead>
           <tbody>

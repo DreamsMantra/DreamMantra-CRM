@@ -19,6 +19,7 @@ import AdminTeamPanel from '../features/admin/panels/AdminTeamPanel';
 import AdminSettingsPanel from '../features/admin/panels/AdminSettingsPanel';
 import AdminModals from '../features/admin/AdminModals';
 import ChatMessenger from '../components/ChatMessenger';
+import PartnerProfilePage from '../components/admin/PartnerProfilePage';
 import { playDuplicateBuzz } from '../utils/duplicateBuzz';
 
 const AdminToolsPanel = lazy(() => import('../features/admin/panels/AdminToolsPanel'));
@@ -36,6 +37,7 @@ export default function AdminDashboard() {
   const [params, setParams] = useSearchParams();
   const { rawTab, tab, sub, inner: innerSub, alias } = resolveAdminRoute(params);
   const pageInfo = PAGE_TITLES[tab] || { title: tab, desc: '' };
+  const partnerProfileId = tab === 'partners' ? params.get('partnerId') : null;
 
   const [leadViewMode, setLeadViewMode] = useState('list');
   const [leadsPanel, setLeadsPanel] = useState('none');
@@ -286,9 +288,13 @@ export default function AdminDashboard() {
   };
 
   const viewPartnerDetail = async (p) => {
-    setViewPartner(p);
-    const detail = await api.admin.getPartner(p.id);
-    setPartnerDetail(detail);
+    setParams({ tab: 'partners', partnerId: p.id });
+  };
+
+  const closePartnerProfile = () => {
+    setParams({ tab: 'partners' });
+    setViewPartner(null);
+    setPartnerDetail(null);
   };
 
   const savePartnerFromDetail = async (id, form) => {
@@ -360,8 +366,10 @@ export default function AdminDashboard() {
       if (opts.leadType) setLeadTypeFilter(opts.leadType);
       if (opts.panel) setLeadsPanel(opts.panel);
     } else if (t === 'partners') {
-      setParams({ tab: 'partners' });
+      const next = { tab: 'partners' };
       if (opts.partnerFilter) setPartnerFilter(opts.partnerFilter);
+      if (opts.partnerId) next.partnerId = opts.partnerId;
+      setParams(next);
     } else if (t === 'finance') setParams({ tab: 'finance', sub: opts.sub || 'commissions' });
     else if (t === 'team') setParams({ tab: 'team', inner: opts.inner || 'users' });
     else if (t === 'settings') setParams({ tab: 'settings', inner: opts.inner || 'general' });
@@ -411,7 +419,7 @@ export default function AdminDashboard() {
       sidebarLinks={sidebarLinks}
       activeTab={tab}
       onTabChange={setTab}
-      title={pageInfo.title}
+      title={partnerProfileId ? 'Partner Profile' : pageInfo.title}
       badge={attentionCount || dashboard?.stats?.pendingPartners || 0}
       notificationItems={attentionItems}
       onNotificationClick={(item) => setTab(item.tab, item.opts || {})}
@@ -420,7 +428,7 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-2">
           <button type="button" className="dm-btn-primary text-xs" onClick={() => openQuickLead()}><Plus className="h-3 w-3" /> Add Lead</button>
           <AdminGlobalSearch
-            onSelectPartner={(p) => { setTab('partners'); viewPartnerDetail(p); }}
+            onSelectPartner={(p) => { setTab('partners', { partnerId: p.id }); }}
             onSelectLead={(l) => { setTab('leads'); openLeadDetail(l); }}
           />
         </div>
@@ -430,7 +438,18 @@ export default function AdminDashboard() {
       {error && <div className="dm-alert-error mb-4"><AlertCircle className="h-4 w-4" /> {error}</div>}
 
       {tab === 'overview' && <AdminOverviewPanel {...panelProps} />}
-      {tab === 'partners' && <AdminPartnersPanel {...panelProps} />}
+      {tab === 'partners' && partnerProfileId && (
+        <PartnerProfilePage
+          partnerId={partnerProfileId}
+          onBack={closePartnerProfile}
+          onOpenLead={(l) => { openLeadDetail(l); }}
+          onMessage={() => setTab('messages')}
+          flash={flash}
+          fail={fail}
+          resetPassword={resetPassword}
+        />
+      )}
+      {tab === 'partners' && !partnerProfileId && <AdminPartnersPanel {...panelProps} />}
       {tab === 'leads' && <AdminLeadsPanel {...panelProps} />}
       {tab === 'students' && (
         <DashboardSection title={pageInfo.title} description={pageInfo.desc}>

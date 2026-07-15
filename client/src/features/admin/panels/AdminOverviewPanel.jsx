@@ -21,17 +21,17 @@ export default function AdminOverviewPanel({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <button type="button" onClick={() => onQuickLead('student')} className="dm-card p-5 text-left transition hover:border-orange/40 hover:shadow-md">
           <Plus className="mb-2 h-6 w-6 text-orange" />
-          <p className="font-semibold text-stone-900">Add Student Lead</p>
-          <p className="text-xs text-stone-500">Quick Students (B2C) entry</p>
+          <p className="font-semibold text-stone-900">Add Potential Student</p>
+          <p className="text-xs text-stone-500">B2C student lead</p>
         </button>
         <button type="button" onClick={() => onQuickLead('business')} className="dm-card p-5 text-left transition hover:border-indigo-300 hover:shadow-md">
           <Plus className="mb-2 h-6 w-6 text-indigo-600" />
-          <p className="font-semibold text-stone-900">Add Business Lead</p>
-          <p className="text-xs text-stone-500">School / college / Partners (B2B)</p>
+          <p className="font-semibold text-stone-900">Add Potential Partner</p>
+          <p className="text-xs text-stone-500">School / college / B2B lead</p>
         </button>
         <button type="button" onClick={() => onPartnerCreate(false)} className="dm-card p-5 text-left transition hover:border-gold/40 hover:shadow-md">
           <UserPlus className="mb-2 h-6 w-6 text-gold-dark" />
-          <p className="font-semibold text-stone-900">Add Partner</p>
+          <p className="font-semibold text-stone-900">Add Partner Account</p>
           <p className="text-xs text-stone-500">Create login & credentials</p>
         </button>
         <button type="button" onClick={() => onTab?.('leads', { view: 'board' })} className="dm-card p-5 text-left transition hover:border-stone-300 hover:shadow-md">

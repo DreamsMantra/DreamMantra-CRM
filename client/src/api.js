@@ -159,6 +159,9 @@ export const api = {
     rates: (params = {}) => request(`/admin/rates?${qs(params)}`),
     upsertRate: (body) => request('/admin/rates', { method: 'POST', body: JSON.stringify(body) }),
     deleteRate: (id) => request(`/admin/rates/${id}`, { method: 'DELETE' }),
+    productRateOverrides: (params = {}) => request(`/admin/product-rate-overrides?${qs(params)}`),
+    upsertProductRateOverride: (body) => request('/admin/product-rate-overrides', { method: 'POST', body: JSON.stringify(body) }),
+    deleteProductRateOverride: (id) => request(`/admin/product-rate-overrides/${id}`, { method: 'DELETE' }),
     partnerResources: (params = {}) => request(`/admin/partner-resources?${qs(params)}`),
     createPartnerResource: (body) => request('/admin/partner-resources', { method: 'POST', body: JSON.stringify(body) }),
     deletePartnerResource: (id) => request(`/admin/partner-resources/${id}`, { method: 'DELETE' }),
@@ -202,6 +205,8 @@ export const api = {
     createCall: (body) => request('/staff/calls', { method: 'POST', body: JSON.stringify(body) }),
     followUps: () => request('/staff/follow-ups'),
     updateLead: (id, body) => request(`/staff/leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    productRateOverrides: (params = {}) => request(`/staff/product-rate-overrides?${qs(params)}`),
+    upsertProductRateOverride: (body) => request('/staff/product-rate-overrides', { method: 'POST', body: JSON.stringify(body) }),
   },
 
   messages: {

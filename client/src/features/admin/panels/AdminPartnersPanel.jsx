@@ -68,7 +68,7 @@ export default function AdminPartnersPanel({
           <thead>
             <tr>
               <th><SelectCheckbox checked={selectedPartners.length === partners.length && partners.length > 0} onChange={() => toggleAll(partners, selectedPartners, setSelectedPartners)} /></th>
-              <th>Name / Partner ID</th><th>Type</th><th>Tier</th><th>Leads</th><th>Commission</th><th>Status</th><th>Verified</th><th>Actions</th>
+              <th>Name / Partner ID</th><th>Type</th><th>Tier</th><th>Leads</th><th>Rates</th><th>Status</th><th>Verified</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -76,15 +76,17 @@ export default function AdminPartnersPanel({
               <tr key={p.id}>
                 <td><SelectCheckbox checked={selectedPartners.includes(p.id)} onChange={() => setSelectedPartners((s) => s.includes(p.id) ? s.filter((x) => x !== p.id) : [...s, p.id])} /></td>
                 <td>
-                  <p className="font-semibold">{p.name}</p>
-                  <p className="font-mono text-xs font-semibold text-gold-dark">{p.loginId || '—'}</p>
-                  <p className="text-xs text-stone-400">{p.email}</p>
-                  {(p.partnerType === 'agency' || p.partnerType === 'franchise') && <p className="text-xs text-orange">{p.territory || p.agencyName || p.franchiseName}</p>}
+                  <button type="button" className="text-left" onClick={() => viewPartnerDetail(p)}>
+                    <p className="font-semibold text-orange hover:underline">{p.name}</p>
+                    <p className="font-mono text-xs font-semibold text-gold-dark">{p.loginId || '—'}</p>
+                    <p className="text-xs text-stone-400">{p.email}</p>
+                    {(p.partnerType === 'agency' || p.partnerType === 'franchise') && <p className="text-xs text-orange">{p.territory || p.agencyName || p.franchiseName}</p>}
+                  </button>
                 </td>
                 <td>{partnerTypeLabel(p.partnerType)}</td>
                 <td className="capitalize">{p.tier || 'bronze'}</td>
                 <td>{p.totalLeads} / <span className="text-emerald-600">{p.convertedLeads}</span></td>
-                <td>{p.commissionRate}%</td>
+                <td className="text-xs text-stone-500">Per product</td>
                 <td><span className={`dm-badge capitalize ${p.status === 'active' ? 'bg-emerald-100 text-emerald-700' : p.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{p.status}</span></td>
                 <td>{p.documentsVerified ? '✓' : '—'}</td>
                 <td>

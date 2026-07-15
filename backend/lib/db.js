@@ -3,7 +3,7 @@ import { loadStore, saveStore, newId, now, findById, sortByDate } from '../lib/s
 import { DEFAULT_FORM_TEMPLATES } from '../data/formDefaults.js';
 import { STAFF_ROLES, EDITABLE_STAFF_ROLES, USER_ROLES, getDefaultPermissions, isStaffRole, normalizeLeadStatus } from './roles.js';
 import { normalizeAgencyUser, isAgencyPartner, agencyTierTarget, AGENCY_ONBOARDING_KEYS } from './agency.js';
-import { generateLoginId, normalizeLoginId, generateReferralCode } from '../utils/ids.js';
+import { generateLoginId, normalizeLoginId, generateReferralCode, generateLeadId } from '../utils/ids.js';
 
 export const PARTNER_TIERS = ['bronze', 'silver', 'gold', 'platinum'];
 
@@ -741,7 +741,11 @@ export function bulkCreateLeads(leadsData, partnerId, createdBy) {
     if (!data.studentName?.trim() || !data.studentPhone?.trim()) continue;
     const lead = createLead({
       ...data,
-      leadId: data.leadId || `DM-${new Date().getFullYear()}-${newId().slice(0, 6).toUpperCase()}`,
+      leadId: data.leadId || (() => {
+        let id = generateLeadId(data.leadType || 'student');
+        while (getLeads().some((l) => l.leadId === id)) id = generateLeadId(data.leadType || 'student');
+        return id;
+      })(),
       partnerId: partner.id,
       partnerName: partner.name,
       partnerType: partner.partnerType,
@@ -758,7 +762,7 @@ export function bulkCreateLeads(leadsData, partnerId, createdBy) {
 
 export function exportLeadsCSV(filter = {}) {
   const leads = getLeads(filter).map(populateLead);
-  const headers = ['Dreamz ID', 'Student', 'Phone', 'Email', 'Class', 'City', 'Status', 'Partner', 'Priority', 'Created'];
+  const headers = ['Lead ID', 'Student', 'Phone', 'Email', 'Class', 'City', 'Status', 'Partner', 'Priority', 'Created'];
   const rows = leads.map((l) => [
     l.leadId, l.studentName, l.studentPhone, l.studentEmail || '', l.classGrade || '',
     l.city || '', l.status, l.partnerName || '', l.priority || '', l.createdAt?.slice(0, 10) || '',
@@ -817,14 +821,39 @@ export function getPartnerDetail(id) {
   if (!partner || partner.role !== 'partner') return null;
   const leads = getLeads({ partnerId: id });
   const commissions = getCommissions({ partnerId: id });
+  const resources = getPartnerResources(id);
+  const products = getProducts();
+  const overrides = getProductRateOverrides({ scope: 'partner', entityId: id });
+  const productRates = products.map((prod) => {
+    const ov = overrides.find((o) => o.productId === prod.id);
+    return {
+      productId: prod.id,
+      label: prod.label,
+      cataloguePrice: prod.price,
+      catalogueCommission: prod.commission || { type: 'fixed', value: 0 },
+      listPrice: ov?.listPrice ?? prod.price,
+      salePrice: ov?.salePrice ?? prod.price,
+      commission: ov?.commission || prod.commission || { type: 'fixed', value: 0 },
+      overrideId: ov?.id || null,
+      hasOverride: !!ov,
+    };
+  });
+  const payouts = getPayoutRequests({ partnerId: id });
+  const paid = commissions.filter((c) => c.status === 'paid').reduce((s, c) => s + (c.amount || 0), 0);
+  const pending = commissions.filter((c) => c.status === 'pending' || c.status === 'approved').reduce((s, c) => s + (c.amount || 0), 0);
   return {
     partner: userToSafeJSON(partner),
     leads: leads.map((l) => ({ ...l, _id: l.id })),
     commissions: commissions.map(populateCommission),
+    resources,
+    productRates,
+    payouts,
     stats: {
       totalLeads: leads.length,
-      converted: leads.filter((l) => l.status === 'converted').length,
-      pendingCommission: commissions.filter((c) => c.status === 'pending' || c.status === 'approved').reduce((s, c) => s + c.amount, 0),
+      converted: leads.filter((l) => ['converted', 'completed'].includes(l.status)).length,
+      pendingCommission: pending,
+      paidCommission: paid,
+      totalEarnings: partner.totalEarnings || paid,
     },
   };
 }
@@ -887,7 +916,7 @@ export function exportPartnersCSV() {
 
 export function exportCommissionsCSV() {
   const items = getCommissions().map(populateCommission);
-  const headers = ['Partner', 'Dreamz ID', 'Student', 'Amount', 'Rate', 'Status', 'Paid At', 'Reference'];
+  const headers = ['Partner', 'Lead ID', 'Student', 'Amount', 'Rate', 'Status', 'Paid At', 'Reference'];
   const rows = items.map((c) => [
     c.partner?.name, c.lead?.leadId, c.lead?.studentName, c.amount, c.rate,
     c.status, c.paidAt?.slice(0, 10) || '', c.paymentReference || '',
@@ -1229,11 +1258,136 @@ export function deleteRate(id) {
   return removed;
 }
 
+/** Per-entity product price/commission overrides (partner account or lead) */
+export function getProductRateOverrides(filter = {}) {
+  let list = loadStore().settings.productRateOverrides || [];
+  if (filter.scope) list = list.filter((o) => o.scope === filter.scope);
+  if (filter.entityId) list = list.filter((o) => o.entityId === filter.entityId);
+  if (filter.productId) list = list.filter((o) => o.productId === filter.productId);
+  return list;
+}
+
+export function upsertProductRateOverride(data) {
+  const store = loadStore();
+  if (!store.settings.productRateOverrides) store.settings.productRateOverrides = [];
+  const scope = data.scope === 'lead' ? 'lead' : 'partner';
+  const entityId = data.entityId;
+  const productId = data.productId;
+  if (!entityId || !productId) throw new Error('entityId and productId required');
+  const payload = {
+    scope,
+    entityId,
+    productId,
+    listPrice: data.listPrice != null ? Number(data.listPrice) : undefined,
+    salePrice: data.salePrice != null ? Number(data.salePrice) : undefined,
+    commission: data.commission
+      ? { type: data.commission.type === 'percentage' ? 'percentage' : 'fixed', value: Number(data.commission.value) || 0 }
+      : undefined,
+    updatedAt: now(),
+  };
+  const idx = store.settings.productRateOverrides.findIndex(
+    (o) => o.scope === scope && o.entityId === entityId && o.productId === productId
+  );
+  if (idx >= 0) {
+    store.settings.productRateOverrides[idx] = {
+      ...store.settings.productRateOverrides[idx],
+      ...payload,
+      id: store.settings.productRateOverrides[idx].id,
+    };
+    saveStore(store);
+    return store.settings.productRateOverrides[idx];
+  }
+  const row = { id: newId(), createdAt: now(), ...payload };
+  store.settings.productRateOverrides.push(row);
+  saveStore(store);
+  return row;
+}
+
+export function deleteProductRateOverride(id) {
+  const store = loadStore();
+  const before = store.settings.productRateOverrides || [];
+  const removed = before.find((o) => o.id === id);
+  if (!removed) return null;
+  store.settings.productRateOverrides = before.filter((o) => o.id !== id);
+  saveStore(store);
+  return removed;
+}
+
+/** Resolve catalogue + lead override + partner override for a product */
+export function resolveProductRate({ productId, leadId, partnerId }) {
+  const products = getProducts();
+  const prod = products.find((p) => p.id === productId || p.label === productId);
+  if (!prod) return null;
+  const base = {
+    productId: prod.id,
+    label: prod.label,
+    listPrice: prod.price,
+    salePrice: prod.price,
+    commission: prod.commission || { type: 'fixed', value: 0 },
+  };
+  if (partnerId) {
+    const rates = getRates({ audience: 'partner', productId: prod.id });
+    const specific = rates.find((r) => r.partnerId === partnerId);
+    const shared = rates.find((r) => r.partnerId === 'all' || r.partnerId == null);
+    const rate = specific || shared;
+    if (rate) {
+      base.listPrice = rate.listPrice ?? base.listPrice;
+      base.salePrice = rate.salePrice ?? base.salePrice;
+    }
+    const pov = getProductRateOverrides({ scope: 'partner', entityId: partnerId, productId: prod.id })[0];
+    if (pov) {
+      if (pov.listPrice != null) base.listPrice = pov.listPrice;
+      if (pov.salePrice != null) base.salePrice = pov.salePrice;
+      if (pov.commission) base.commission = pov.commission;
+    }
+  }
+  if (leadId) {
+    const lov = getProductRateOverrides({ scope: 'lead', entityId: leadId, productId: prod.id })[0];
+    if (lov) {
+      if (lov.listPrice != null) base.listPrice = lov.listPrice;
+      if (lov.salePrice != null) base.salePrice = lov.salePrice;
+      if (lov.commission) base.commission = lov.commission;
+    }
+  }
+  return base;
+}
+
+export function computeCommissionAmount(lead, partner) {
+  const interested = lead.interestedIn || [];
+  let total = 0;
+  const partnerId = partner?.id || lead.partnerId;
+  const leadId = lead.id || lead._id;
+  if (interested.length) {
+    interested.forEach((label) => {
+      const resolved = resolveProductRate({ productId: label, leadId, partnerId });
+      if (!resolved) return;
+      const price = resolved.salePrice ?? resolved.listPrice ?? 0;
+      if (resolved.commission?.type === 'fixed') total += Number(resolved.commission.value) || 0;
+      else if (resolved.commission?.type === 'percentage') total += price * ((Number(resolved.commission.value) || 0) / 100);
+    });
+  }
+  if (!total) {
+    const products = getProducts();
+    if (products[0]) {
+      const resolved = resolveProductRate({ productId: products[0].id, leadId, partnerId });
+      const price = lead.dealValue || lead.expectedValue || resolved?.salePrice || 5000;
+      if (resolved?.commission?.type === 'fixed') total = Number(resolved.commission.value) || 0;
+      else if (resolved?.commission?.type === 'percentage') total = price * ((Number(resolved.commission.value) || 0) / 100);
+      else total = price * ((partner?.commissionRate || 10) / 100);
+    } else {
+      total = (lead.expectedValue || 5000) * ((partner?.commissionRate || 10) / 100);
+    }
+  }
+  return Math.round(total);
+}
+
 /** Partner-facing rates for allocated products */
 export function getRatesForPartner(partnerId) {
   const products = getAllocatedProductsForPartner(partnerId);
   const rates = getRates({ audience: 'partner' });
+  const overrides = getProductRateOverrides({ scope: 'partner', entityId: partnerId });
   return products.map((product) => {
+    const ov = overrides.find((o) => o.productId === product.id);
     const specific = rates.find((r) => r.productId === product.id && r.partnerId === partnerId);
     const shared = rates.find(
       (r) => r.productId === product.id && (r.partnerId === 'all' || r.partnerId == null)
@@ -1242,9 +1396,11 @@ export function getRatesForPartner(partnerId) {
     return {
       productId: product.id,
       label: product.label,
-      listPrice: rate?.listPrice ?? product.price ?? 0,
-      salePrice: rate?.salePrice ?? product.price ?? 0,
+      listPrice: ov?.listPrice ?? rate?.listPrice ?? product.price ?? 0,
+      salePrice: ov?.salePrice ?? rate?.salePrice ?? product.price ?? 0,
+      commission: ov?.commission || product.commission || { type: 'fixed', value: 0 },
       rateId: rate?.id || null,
+      overrideId: ov?.id || null,
     };
   });
 }
@@ -1568,22 +1724,6 @@ export function deleteAutomation(id) {
   const store = loadStore();
   store.automations = (store.automations || []).filter((a) => a.id !== id);
   saveStore(store);
-}
-
-export function computeCommissionAmount(lead, partner) {
-  const products = getProducts();
-  const interested = lead.interestedIn || [];
-  let total = 0;
-  if (interested.length) {
-    interested.forEach((label) => {
-      const prod = products.find((p) => p.label === label || p.id === label);
-      if (!prod) return;
-      if (prod.commission?.type === 'fixed') total += prod.commission.value;
-      else if (prod.commission?.type === 'percentage') total += (prod.price || 0) * (prod.commission.value / 100);
-    });
-  }
-  if (!total) total = (lead.expectedValue || 5000) * ((partner?.commissionRate || 10) / 100);
-  return Math.round(total);
 }
 
 // ─── Enterprise: Audit log (append-only) ───

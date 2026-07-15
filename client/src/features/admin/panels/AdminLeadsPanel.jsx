@@ -6,7 +6,7 @@ import LeadKanban from '../../../components/LeadKanban';
 import PartnerSelect from '../../../components/PartnerSelect';
 import { BulkActionBar, SelectCheckbox } from '../../../components/admin/AdminTools';
 import { LEAD_STATUSES, formatDate } from '../../../utils/constants';
-import { leadDisplayName, leadDisplayPhone } from '../../../config/adminTabs';
+import { leadDisplayName, leadDisplayPhone, leadLifecycleLabel } from '../../../config/adminTabs';
 import { api } from '../../../api';
 
 const PRIORITIES = ['low', 'medium', 'high'];
@@ -92,7 +92,7 @@ export default function AdminLeadsPanel({
       <div className="flex flex-wrap items-center gap-2">
         {['all', 'student', 'business'].map((t) => (
           <button key={t} type="button" onClick={() => setLeadTypeFilter(t)} className={`rounded-full px-3 py-1.5 text-xs font-medium ${leadTypeFilter === t ? 'bg-orange text-white' : 'bg-stone-100 text-stone-600'}`}>
-            {t === 'all' ? 'All' : t === 'student' ? 'Students (B2C)' : 'Partners (B2B)'}
+            {t === 'all' ? 'All' : t === 'student' ? 'Potential Students' : 'Potential Partners'}
           </button>
         ))}
         <span className="mx-1 h-4 w-px bg-stone-200" />
@@ -169,7 +169,7 @@ export default function AdminLeadsPanel({
               <thead>
                 <tr>
                   <th><SelectCheckbox checked={selectedLeads.length === displayLeads.length && displayLeads.length > 0} onChange={() => toggleAll(displayLeads, selectedLeads, setSelectedLeads)} /></th>
-                  <th>Dreamz ID</th><th>Type</th><th>Name / Contact</th><th>Partner</th><th>Status</th><th>Follow-up</th>
+                  <th>Lead ID</th><th>Type</th><th>Name / Contact</th><th>Partner</th><th>Status</th><th>Follow-up</th>
                 </tr>
               </thead>
               <tbody>
@@ -182,7 +182,7 @@ export default function AdminLeadsPanel({
                   <tr key={lead.id || lead._id} className="cursor-pointer" onClick={() => openLeadDetail(lead)}>
                     <td onClick={(e) => e.stopPropagation()}><SelectCheckbox checked={selectedLeads.includes(lead.id || lead._id)} onChange={() => setSelectedLeads((s) => { const id = lead.id || lead._id; return s.includes(id) ? s.filter((x) => x !== id) : [...s, id]; })} /></td>
                     <td className="font-mono text-gold-dark">{lead.leadId}</td>
-                    <td><span className={`dm-badge text-xs ${lead.leadType === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>{lead.leadType === 'business' ? 'Partners (B2B)' : 'Students (B2C)'}</span></td>
+                    <td><span className={`dm-badge text-xs ${lead.leadType === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>{leadLifecycleLabel(lead)}</span></td>
                     <td className="font-medium">{leadDisplayName(lead)}<br /><span className="text-xs text-stone-400">{leadDisplayPhone(lead)}</span></td>
                     <td>{lead.partner?.name || lead.partnerName}</td>
                     <td><StatusBadge status={lead.status} /></td>

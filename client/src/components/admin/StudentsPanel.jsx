@@ -161,13 +161,13 @@ export default function StudentsPanel({
         )}
       </div>
 
-      <input className="dm-input max-w-md" placeholder="Search name, mobile, Dreamz ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <input className="dm-input max-w-md" placeholder="Search name, mobile, Lead ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
 
       <div className="dm-card overflow-x-auto">
         <table className="dm-table w-full">
           <thead>
             <tr>
-              <th>Dreamz ID</th><th>Student</th><th>Parent</th><th>Mobile</th><th>Class</th><th>School</th>
+              <th>Lead ID</th><th>Student</th><th>Parent</th><th>Mobile</th><th>Class</th><th>School</th>
               <th>Project</th><th>Partner</th><th>Product</th><th>Status</th>
               {assignMode && <th>Assign Sales</th>}
               <th>Actions</th>

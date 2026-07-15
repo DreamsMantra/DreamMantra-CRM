@@ -50,6 +50,7 @@ export const defaultStore = {
     customRoles: [],
     productAllocations: [],
     rates: [],
+    productRateOverrides: [],
     partnerResources: [],
     defaultResources: [],
     leadStatuses: null,
@@ -100,6 +101,7 @@ function normalizeStore(store) {
   if (!Array.isArray(normalized.settings.customRoles)) normalized.settings.customRoles = [];
   if (!Array.isArray(normalized.settings.productAllocations)) normalized.settings.productAllocations = [];
   if (!Array.isArray(normalized.settings.rates)) normalized.settings.rates = [];
+  if (!Array.isArray(normalized.settings.productRateOverrides)) normalized.settings.productRateOverrides = [];
   if (!Array.isArray(normalized.settings.partnerResources)) normalized.settings.partnerResources = [];
   if (!Array.isArray(normalized.settings.defaultResources)) normalized.settings.defaultResources = [];
   if (!normalized.settings.emailTemplates) normalized.settings.emailTemplates = defaultStore.settings.emailTemplates;
