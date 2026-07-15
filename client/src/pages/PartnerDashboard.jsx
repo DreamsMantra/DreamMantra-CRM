@@ -661,17 +661,19 @@ export default function PartnerDashboard() {
         <DashboardSection title={pageInfo.title} description={pageInfo.desc}>
           <div className="space-y-6">
             <div className="grid gap-3 md:grid-cols-2">
-              {partnerProducts.map((p) => (
-                <div key={p.id} className="dm-card p-4">
-                  <p className="font-semibold text-stone-900">{p.label}</p>
-                  <p className="mt-1 text-sm text-stone-500">Base price: {formatCurrency(p.price)}</p>
-                  {p.commission && (
-                    <p className="mt-1 text-xs text-gold-dark">
-                      Commission: {p.commission.type === 'percentage' ? `${p.commission.value}%` : formatCurrency(p.commission.value)}
-                    </p>
-                  )}
-                </div>
-              ))}
+              {partnerProducts.map((p) => {
+                const cost = Number(p.costPrice ?? p.price) || 0;
+                const sell = Number(p.defaultSellingPrice ?? p.price) || 0;
+                const earnings = Math.max(0, Math.round(sell - cost));
+                return (
+                  <div key={p.id} className="dm-card p-4">
+                    <p className="font-semibold text-stone-900">{p.label}</p>
+                    <p className="mt-1 text-sm text-stone-500">Cost: {formatCurrency(cost)}</p>
+                    <p className="mt-0.5 text-sm text-stone-500">Selling: {formatCurrency(sell)}</p>
+                    <p className="mt-1 text-sm font-semibold text-emerald-700">Earnings: {formatCurrency(earnings)}</p>
+                  </div>
+                );
+              })}
               {!partnerProducts.length && (
                 <p className="dm-card col-span-full p-8 text-center text-sm text-stone-400">No products allocated to you yet</p>
               )}
@@ -690,16 +692,20 @@ export default function PartnerDashboard() {
               <thead>
                 <tr>
                   <th>Product</th>
-                  <th>List price</th>
-                  <th>Sale price</th>
+                  <th>Cost</th>
+                  <th>Selling</th>
+                  <th>Earnings</th>
                 </tr>
               </thead>
               <tbody>
                 {partnerRates.map((r) => (
                   <tr key={r.rateId || r.productId}>
                     <td className="font-medium">{r.label}</td>
-                    <td>{formatCurrency(r.listPrice)}</td>
-                    <td className="font-semibold text-emerald-700">{formatCurrency(r.salePrice)}</td>
+                    <td>{formatCurrency(r.costPrice ?? r.listPrice)}</td>
+                    <td>{formatCurrency(r.sellingPrice ?? r.salePrice)}</td>
+                    <td className="font-semibold text-emerald-700">
+                      {formatCurrency(r.earnings ?? Math.max(0, (Number(r.sellingPrice ?? r.salePrice) || 0) - (Number(r.costPrice ?? r.listPrice) || 0)))}
+                    </td>
                   </tr>
                 ))}
               </tbody>

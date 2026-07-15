@@ -77,12 +77,6 @@ export default function ProductsPricing({ embedded = false }) {
     setProducts(next);
   };
 
-  const updateCommission = (idx, field, value) => {
-    const next = [...products];
-    next[idx] = { ...next[idx], commission: { ...next[idx].commission, [field]: value } };
-    setProducts(next);
-  };
-
   const saveProducts = async () => {
     setSaving(true);
     setError('');
@@ -93,7 +87,6 @@ export default function ProductsPricing({ embedded = false }) {
         price: Number(p.costPrice ?? p.price) || 0,
         costPrice: Number(p.costPrice ?? p.price) || 0,
         defaultSellingPrice: Number(p.defaultSellingPrice ?? p.price) || 0,
-        commission: p.commission,
       }));
       const res = await api.admin.updateProducts(payload);
       setProducts(res.products || payload);
@@ -114,7 +107,6 @@ export default function ProductsPricing({ embedded = false }) {
         price: 0,
         costPrice: 0,
         defaultSellingPrice: 0,
-        commission: { type: 'fixed', value: 0 },
       },
     ]);
   };
@@ -218,7 +210,7 @@ export default function ProductsPricing({ embedded = false }) {
         </div>
         <div className="space-y-3">
           {products.map((p, i) => (
-            <div key={p.id} className="dm-card p-4 grid gap-3 md:grid-cols-5">
+            <div key={p.id} className="dm-card p-4 grid gap-3 md:grid-cols-4">
               <div>
                 <label className="dm-label">Product</label>
                 <input className="dm-input" value={p.label} onChange={(e) => update(i, 'label', e.target.value)} />
@@ -234,15 +226,11 @@ export default function ProductsPricing({ embedded = false }) {
                 <p className="mt-0.5 text-[10px] text-stone-400">What partner sells to customer</p>
               </div>
               <div>
-                <label className="dm-label">Commission Type</label>
-                <select className="dm-input" value={p.commission?.type || 'fixed'} onChange={(e) => updateCommission(i, 'type', e.target.value)}>
-                  <option value="fixed">Fixed ₹</option>
-                  <option value="percentage">Percentage %</option>
-                </select>
-              </div>
-              <div>
-                <label className="dm-label">Commission Value</label>
-                <input type="number" className="dm-input" value={p.commission?.value || 0} onChange={(e) => updateCommission(i, 'value', Number(e.target.value))} />
+                <label className="dm-label">Earnings (₹)</label>
+                <p className="dm-input flex items-center bg-emerald-50 font-semibold text-emerald-800">
+                  {Math.max(0, Math.round((Number(p.defaultSellingPrice) || 0) - (Number(p.costPrice ?? p.price) || 0))).toLocaleString('en-IN')}
+                </p>
+                <p className="mt-0.5 text-[10px] text-stone-400">Selling − Cost</p>
               </div>
             </div>
           ))}

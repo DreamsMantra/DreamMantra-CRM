@@ -88,8 +88,6 @@ export default function PartnerProfilePage({
         drafts[r.productId] = {
           costPrice: r.costPrice,
           sellingPrice: r.sellingPrice,
-          commissionType: r.commission?.type || 'fixed',
-          commissionValue: r.commission?.value ?? 0,
         };
       });
       setRateDrafts(drafts);
@@ -161,7 +159,6 @@ export default function PartnerProfilePage({
         productId,
         costPrice: Number(d.costPrice),
         sellingPrice: Number(d.sellingPrice),
-        commission: { type: d.commissionType, value: Number(d.commissionValue) },
       });
       flash?.('Product prices saved for this partner');
       load();
@@ -546,13 +543,16 @@ export default function PartnerProfilePage({
           title="Products & rates"
           description={
             isAgency
-              ? 'Cost = what we sell to this agency. Selling = what they charge customers. Agency can change selling (incl. per project), not cost. Only allocated products are listed.'
-              : 'Cost = what we sell to this partner. Selling = default customer price (can still vary per lead). Only allocated products are listed.'
+              ? 'Cost = what we sell to this agency. Selling = customer price. Earnings = Selling − Cost. Only allocated products are listed.'
+              : 'Cost = what we sell to this partner. Selling = customer price. Earnings = Selling − Cost. Only allocated products are listed.'
           }
         >
           <div className="space-y-3">
             {productRates.map((r) => {
               const d = rateDrafts[r.productId] || {};
+              const cost = Number(d.costPrice) || 0;
+              const sell = Number(d.sellingPrice) || 0;
+              const earnings = Math.max(0, Math.round(sell - cost));
               return (
                 <div key={r.productId} className="grid items-end gap-3 rounded-xl border border-stone-100 p-3 sm:grid-cols-5">
                   <div>
@@ -568,18 +568,10 @@ export default function PartnerProfilePage({
                     <label className="dm-label">Selling price ₹</label>
                     <input type="number" className="dm-input" value={d.sellingPrice ?? ''} onChange={(e) => setRateDrafts({ ...rateDrafts, [r.productId]: { ...d, sellingPrice: e.target.value } })} />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="dm-label">Comm.</label>
-                      <select className="dm-input" value={d.commissionType || 'fixed'} onChange={(e) => setRateDrafts({ ...rateDrafts, [r.productId]: { ...d, commissionType: e.target.value } })}>
-                        <option value="fixed">₹</option>
-                        <option value="percentage">%</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="dm-label">Value</label>
-                      <input type="number" className="dm-input" value={d.commissionValue ?? ''} onChange={(e) => setRateDrafts({ ...rateDrafts, [r.productId]: { ...d, commissionValue: e.target.value } })} />
-                    </div>
+                  <div>
+                    <label className="dm-label">Earnings ₹</label>
+                    <p className="dm-input flex items-center bg-emerald-50 font-semibold text-emerald-800">{formatCurrency(earnings)}</p>
+                    <p className="text-[10px] text-stone-400">Selling − Cost</p>
                   </div>
                   <button type="button" className="dm-btn-ghost text-sm" onClick={() => saveRate(r.productId)}>Save</button>
                 </div>
@@ -805,6 +797,7 @@ function ProjectPriceRow({ product, onSaveCost, onSaveSelling }) {
     setCost(product.costPrice ?? '');
     setSelling(product.sellingPrice ?? '');
   }, [product.costPrice, product.sellingPrice, product.productId]);
+  const earnings = Math.max(0, Math.round((Number(selling) || 0) - (Number(cost) || 0)));
   return (
     <div className="flex flex-wrap items-end gap-2 rounded-lg bg-stone-50 p-2 text-sm">
       <span className="min-w-[7rem] font-medium">{product.label}</span>
@@ -818,6 +811,10 @@ function ProjectPriceRow({ product, onSaveCost, onSaveSelling }) {
         <input type="number" className="dm-input w-24" value={selling} onChange={(e) => setSelling(e.target.value)} />
       </div>
       <button type="button" className="dm-btn-ghost text-[10px]" onClick={() => onSaveSelling(selling)}>Save selling</button>
+      <div className="ml-auto text-right">
+        <p className="text-[10px] uppercase text-stone-400">Earnings</p>
+        <p className="font-semibold text-emerald-700">{formatCurrency(earnings)}</p>
+      </div>
     </div>
   );
 }

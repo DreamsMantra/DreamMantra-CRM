@@ -902,12 +902,15 @@ export function getPartnerDetail(id) {
   const productRates = products.map((prod) => {
     const resolved = resolveProductRate({ productId: prod.id, partnerId: id });
     const ov = overrides.find((o) => o.productId === prod.id);
+    const costPrice = resolved?.costPrice ?? prod.costPrice ?? prod.price;
+    const sellingPrice = resolved?.sellingPrice ?? prod.defaultSellingPrice ?? prod.price;
+    const earnings = productEarnings(costPrice, sellingPrice);
     return {
       productId: prod.id,
       label: prod.label,
-      costPrice: resolved?.costPrice ?? prod.costPrice ?? prod.price,
-      sellingPrice: resolved?.sellingPrice ?? prod.defaultSellingPrice ?? prod.price,
-      commission: resolved?.commission || prod.commission || { type: 'fixed', value: 0 },
+      costPrice,
+      sellingPrice,
+      earnings,
       overrideId: ov?.id || null,
       hasOverride: !!ov,
     };
@@ -1184,12 +1187,14 @@ export function getProducts() {
 function normalizeProduct(p) {
   const cost = Number(p.price ?? p.costPrice) || 0;
   const selling = Number(p.defaultSellingPrice ?? p.sellingPrice ?? cost) || cost;
+  const earnings = Math.max(0, Math.round(selling - cost));
   return {
     ...p,
     price: cost,
     costPrice: cost,
     defaultSellingPrice: selling,
-    commission: p.commission || { type: 'fixed', value: 0 },
+    earnings,
+    commission: { type: 'fixed', value: earnings },
   };
 }
 
@@ -1197,14 +1202,13 @@ export function updateProducts(products) {
   const store = loadStore();
   store.settings.products = (products || []).map((p) => {
     const cost = Number(p.costPrice ?? p.price) || 0;
+    const selling = Number(p.defaultSellingPrice ?? p.sellingPrice ?? cost) || cost;
     return {
       id: p.id || newId(),
       label: (p.label || '').trim() || 'Product',
       price: cost,
-      defaultSellingPrice: Number(p.defaultSellingPrice ?? p.sellingPrice ?? cost) || cost,
-      commission: p.commission
-        ? { type: p.commission.type === 'percentage' ? 'percentage' : 'fixed', value: Number(p.commission.value) || 0 }
-        : { type: 'fixed', value: 0 },
+      costPrice: cost,
+      defaultSellingPrice: selling,
     };
   });
   saveStore(store);
@@ -1506,7 +1510,15 @@ export function resolveProductRate({ productId, leadId, partnerId, projectId }) 
 
   base.listPrice = base.costPrice;
   base.salePrice = base.sellingPrice;
+  base.earnings = productEarnings(base.costPrice, base.sellingPrice);
+  base.commission = { type: 'fixed', value: base.earnings };
   return base;
+}
+
+export function productEarnings(costPrice, sellingPrice) {
+  const cost = Number(costPrice) || 0;
+  const sell = Number(sellingPrice) || 0;
+  return Math.max(0, Math.round(sell - cost));
 }
 
 export function computeCommissionAmount(lead, partner) {
@@ -1519,21 +1531,16 @@ export function computeCommissionAmount(lead, partner) {
     interested.forEach((label) => {
       const resolved = resolveProductRate({ productId: label, leadId, partnerId, projectId });
       if (!resolved) return;
-      const price = resolved.sellingPrice ?? resolved.salePrice ?? 0;
-      if (resolved.commission?.type === 'fixed') total += Number(resolved.commission.value) || 0;
-      else if (resolved.commission?.type === 'percentage') total += price * ((Number(resolved.commission.value) || 0) / 100);
+      total += productEarnings(resolved.costPrice, resolved.sellingPrice);
     });
   }
   if (!total) {
     const products = getProducts();
     if (products[0]) {
       const resolved = resolveProductRate({ productId: products[0].id, leadId, partnerId, projectId });
-      const price = lead.dealValue || lead.expectedValue || resolved?.sellingPrice || 5000;
-      if (resolved?.commission?.type === 'fixed') total = Number(resolved.commission.value) || 0;
-      else if (resolved?.commission?.type === 'percentage') total = price * ((Number(resolved.commission.value) || 0) / 100);
-      else total = price * ((partner?.commissionRate || 10) / 100);
-    } else {
-      total = (lead.expectedValue || 5000) * ((partner?.commissionRate || 10) / 100);
+      if (resolved) {
+        total = productEarnings(resolved.costPrice, resolved.sellingPrice);
+      }
     }
   }
   return Math.round(total);
@@ -1544,15 +1551,19 @@ export function getRatesForPartner(partnerId) {
   const products = getAllocatedProductsForPartner(partnerId);
   return products.map((product) => {
     const resolved = resolveProductRate({ productId: product.id, partnerId });
+    const costPrice = resolved?.costPrice ?? product.costPrice ?? product.price ?? 0;
+    const sellingPrice = resolved?.sellingPrice ?? product.defaultSellingPrice ?? product.price ?? 0;
+    const earnings = productEarnings(costPrice, sellingPrice);
     return {
       productId: product.id,
       label: product.label,
-      costPrice: resolved?.costPrice ?? product.costPrice ?? product.price ?? 0,
-      sellingPrice: resolved?.sellingPrice ?? product.defaultSellingPrice ?? product.price ?? 0,
-      commission: resolved?.commission || product.commission || { type: 'fixed', value: 0 },
-      // legacy
-      listPrice: resolved?.costPrice ?? product.price ?? 0,
-      salePrice: resolved?.sellingPrice ?? product.price ?? 0,
+      costPrice,
+      sellingPrice,
+      earnings,
+      // legacy aliases
+      listPrice: costPrice,
+      salePrice: sellingPrice,
+      commission: { type: 'fixed', value: earnings },
     };
   });
 }
@@ -2126,7 +2137,10 @@ export function enrichProject(project, leads = null) {
       label: prod.label,
       costPrice: resolved?.costPrice ?? prod.costPrice ?? 0,
       sellingPrice: resolved?.sellingPrice ?? prod.defaultSellingPrice ?? 0,
-      commission: resolved?.commission || prod.commission,
+      earnings: resolved?.earnings ?? productEarnings(
+        resolved?.costPrice ?? prod.costPrice ?? 0,
+        resolved?.sellingPrice ?? prod.defaultSellingPrice ?? 0
+      ),
     };
   });
   return {
